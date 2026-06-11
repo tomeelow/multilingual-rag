@@ -1,0 +1,67 @@
+{
+  "config": "hybrid",
+  "overall": {
+    "n": 57,
+    "doc_hit@5": 0.877,
+    "doc_recall@5": 0.83,
+    "unit_hit@5": 0.673,
+    "unit_recall@5": 0.645,
+    "mrr": 0.487
+  },
+  "by_difficulty": {
+    "simple": {
+      "n": 41,
+      "doc_hit@5": 0.976,
+      "doc_recall@5": 0.976,
+      "unit_hit@5": 0.846,
+      "unit_recall@5": 0.833,
+      "mrr": 0.601
+    },
+    "cross-lingual": {
+      "n": 11,
+      "doc_hit@5": 0.455,
+      "doc_recall@5": 0.455,
+      "unit_hit@5": 0.182,
+      "unit_recall@5": 0.182,
+      "mrr": 0.182
+    },
+    "multi-hop": {
+      "n": 5,
+      "doc_hit@5": 1.0,
+      "doc_recall@5": 0.467,
+      "unit_hit@5": 0.4,
+      "unit_recall@5": 0.2,
+      "mrr": 0.267
+    }
+  },
+  "by_language": {
+    "en": {
+      "n": 23,
+      "doc_hit@5": 0.913,
+      "doc_recall@5": 0.87,
+      "unit_hit@5": 0.783,
+      "unit_recall@5": 0.739,
+      "mrr": 0.476
+    },
+    "pl": {
+      "n": 23,
+      "doc_hit@5": 0.87,
+      "doc_recall@5": 0.826,
+      "unit_hit@5": 0.571,
+      "unit_recall@5": 0.548,
+      "mrr": 0.421
+    },
+    "uk": {
+      "n": 11,
+      "doc_hit@5": 0.818,
+      "doc_recall@5": 0.758,
+      "unit_hit@5": 0.636,
+      "unit_recall@5": 0.636,
+      "mrr": 0.636
+    }
+  },
+  "latency_ms": {
+    "p50": 54.1,
+    "p95": 64.4
+  }
+}

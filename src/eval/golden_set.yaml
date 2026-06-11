@@ -1,0 +1,673 @@
+# Golden evaluation set: 57 hand-written question -> expected-citation pairs.
+#
+# Difficulty tiers:
+#   simple        — question and answer in the same language, single document
+#   cross-lingual — answer lives in a document of a different language
+#   multi-hop     — requires synthesizing two documents
+#
+# relevant_unit_ids point at structural units (articles/recitals/annexes) —
+# stable across re-chunking, unlike chunk ids. A retrieved chunk counts as a
+# hit if it descends from a listed unit. Items citing unstructured guidance
+# list only relevant_document_ids (excluded from unit-level metrics).
+# No real personal data appears in any question or answer.
+
+# ---------------------------------------------------------------- EN simple
+- id: en-simple-01
+  question: What are the lawful bases for processing personal data under the GDPR?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 6(1) GDPR allows processing only with the data subject's consent, or
+    where necessary for a contract, a legal obligation, vital interests, a public
+    task, or legitimate interests not overridden by the data subject's rights.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:6]
+
+- id: en-simple-02
+  question: What conditions must consent meet to be valid under the GDPR?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Under Article 7 GDPR the controller must be able to demonstrate consent, the
+    request must be clearly distinguishable and in plain language, and consent
+    must be as easy to withdraw as to give.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:7]
+
+- id: en-simple-03
+  question: When does the right to erasure ("right to be forgotten") apply?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 17 GDPR grants erasure when data are no longer necessary, consent is
+    withdrawn, the subject objects, processing was unlawful, or a legal
+    obligation requires erasure — subject to exceptions such as freedom of
+    expression and legal claims.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:17]
+
+- id: en-simple-04
+  question: Within what deadline must a controller notify a personal data breach to the supervisory authority?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 33 GDPR: without undue delay and, where feasible, not later than 72
+    hours after becoming aware of the breach, unless it is unlikely to result in
+    a risk to rights and freedoms.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:33]
+
+- id: en-simple-05
+  question: When is a data protection impact assessment required under the GDPR?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 35 GDPR requires a DPIA where processing is likely to result in a
+    high risk, in particular systematic and extensive automated evaluation,
+    large-scale processing of special categories, or systematic monitoring of
+    publicly accessible areas.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:35]
+
+- id: en-simple-06
+  question: When must an organisation designate a data protection officer?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 37 GDPR: when processing is carried out by a public authority, when
+    core activities require regular and systematic large-scale monitoring, or
+    when they consist of large-scale processing of special categories or
+    criminal-conviction data.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:37]
+
+- id: en-simple-07
+  question: What are the maximum administrative fines under the GDPR?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 83 GDPR: up to EUR 20 million or 4% of total worldwide annual
+    turnover, whichever is higher, for the most serious infringements; a lower
+    tier of EUR 10 million / 2% applies to others.
+  relevant_document_ids: [gdpr_en]
+  relevant_unit_ids: [gdpr_en:art:83]
+
+- id: en-simple-08
+  question: Which AI practices are prohibited under the AI Act?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 5 AI Act prohibits, among others, manipulative or exploitative
+    techniques causing significant harm, social scoring by public or private
+    actors, predictive policing based solely on profiling, untargeted scraping
+    of facial images, emotion recognition at work and school, certain biometric
+    categorisation, and real-time remote biometric identification in public
+    spaces for law enforcement subject to narrow exceptions.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:5]
+
+- id: en-simple-09
+  question: How does the AI Act determine whether an AI system is high-risk?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 6 AI Act: a system is high-risk if it is a safety component of a
+    product covered by Annex I legislation, or if it falls within the use cases
+    of Annex III (e.g. biometrics, employment, essential services, law
+    enforcement), unless it poses no significant risk under Article 6(3).
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:6, eu_ai_act_2024:annex:III]
+
+- id: en-simple-10
+  question: What transparency obligations apply to chatbots and deepfakes under the AI Act?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 50 AI Act: people must be informed they are interacting with an AI
+    system; synthetic audio/image/video/text must be marked machine-readably;
+    deployers of deepfakes must disclose that content was artificially generated
+    or manipulated.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:50]
+
+- id: en-simple-11
+  question: What are the maximum penalties for non-compliance with the AI Act?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 99 AI Act: up to EUR 35 million or 7% of worldwide annual turnover
+    for prohibited-practice violations; up to EUR 15 million or 3% for most
+    other obligations; up to EUR 7.5 million or 1% for supplying incorrect
+    information.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:99]
+
+- id: en-simple-12
+  question: What human oversight must high-risk AI systems allow?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 14 AI Act requires high-risk systems to be designed so natural
+    persons can effectively oversee them — understand capacities and
+    limitations, monitor operation, interpret output, decide not to use it,
+    intervene or stop the system.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:14]
+
+- id: en-simple-13
+  question: What data governance requirements apply to training data for high-risk AI systems?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 10 AI Act: training, validation and testing data must follow
+    appropriate governance practices — relevant design choices, provenance,
+    examination for biases, measures to detect and mitigate them — and be
+    relevant, sufficiently representative, and as error-free and complete as
+    possible.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:10]
+
+- id: en-simple-14
+  question: What obligations do providers of general-purpose AI models have?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 53 AI Act: maintain technical documentation, provide information to
+    downstream providers, put in place a copyright-compliance policy, and
+    publish a sufficiently detailed summary of training content.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:53]
+
+- id: en-simple-15
+  question: How are very large online platforms designated under the DSA?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 33 DSA: platforms with 45 million or more average monthly active
+    recipients in the EU are designated by the Commission as very large online
+    platforms or search engines.
+  relevant_document_ids: [dsa_en]
+  relevant_unit_ids: [dsa_en:art:33]
+
+- id: en-simple-16
+  question: What must a hosting service do when it receives a notice about illegal content?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 16 DSA requires easy-to-use notice-and-action mechanisms; notices
+    with sufficient elements give rise to actual knowledge, and providers must
+    process them timely, diligently, non-arbitrarily and inform the notifier of
+    the decision.
+  relevant_document_ids: [dsa_en]
+  relevant_unit_ids: [dsa_en:art:16]
+
+- id: en-simple-17
+  question: What is the role of trusted flaggers under the DSA?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 22 DSA: notices submitted by designated trusted flaggers must be
+    prioritised and processed without undue delay; status is awarded by the
+    Digital Services Coordinator to expert, independent, diligent entities.
+  relevant_document_ids: [dsa_en]
+  relevant_unit_ids: [dsa_en:art:22]
+
+- id: en-simple-18
+  question: What systemic risk assessments must very large online platforms carry out?
+  question_language: en
+  difficulty: simple
+  ground_truth_answer: >
+    Article 34 DSA: VLOPs must diligently identify and assess systemic risks
+    stemming from their services — illegal content dissemination, effects on
+    fundamental rights, civic discourse and elections, gender-based violence,
+    public health, and minors — at least annually and before deploying critical
+    functionalities.
+  relevant_document_ids: [dsa_en]
+  relevant_unit_ids: [dsa_en:art:34]
+
+# ----------------------------------------------------------- EN cross-lingual
+- id: en-cross-01
+  question: How many days of annual leave is an employee entitled to under the Polish Labour Code?
+  question_language: en
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Art. 154 of the Polish Labour Code (Kodeks pracy): 20 days for employees
+    with less than 10 years of service, 26 days for those with at least 10
+    years.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: [pl_labour_code:art:154]
+
+- id: en-cross-02
+  question: What does Ukrainian law require for consent to the processing of personal data?
+  question_language: en
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Under Закон № 2297-VI consent must be a voluntary expression of will
+    (Стаття 2) and is the primary legal basis for processing under Стаття 11;
+    it may be given in written or electronic form that allows confirming it.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:2, ua_data_protection_law:art:11]
+
+- id: en-cross-03
+  question: What rights does a data subject have under the Ukrainian personal data protection law?
+  question_language: en
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Стаття 8 of Закон № 2297-VI lists the rights — to know about processing, to
+    access one's data, to object, to demand rectification or erasure, to
+    protection from unlawful processing, and to complain to the Ombudsman or
+    courts.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:8]
+
+# --------------------------------------------------------------- EN multi-hop
+- id: en-multi-01
+  question: How do the maximum fines under the AI Act compare with those under the GDPR?
+  question_language: en
+  difficulty: multi-hop
+  ground_truth_answer: >
+    GDPR Article 83 caps fines at EUR 20 million or 4% of worldwide turnover;
+    the AI Act Article 99 goes higher for prohibited practices — EUR 35 million
+    or 7% of turnover.
+  relevant_document_ids: [gdpr_en, eu_ai_act_2024]
+  relevant_unit_ids: [gdpr_en:art:83, eu_ai_act_2024:art:99]
+
+- id: en-multi-02
+  question: Is personal data used for AI model training covered by the GDPR, and what does the AI Act add for high-risk training data?
+  question_language: en
+  difficulty: multi-hop
+  ground_truth_answer: >
+    Training on personal data needs a lawful basis under GDPR Article 6; for
+    high-risk AI systems the AI Act Article 10 adds data-governance duties:
+    bias examination and mitigation, provenance, representativeness and quality
+    of training, validation and testing sets.
+  relevant_document_ids: [gdpr_en, eu_ai_act_2024]
+  relevant_unit_ids: [gdpr_en:art:6, eu_ai_act_2024:art:10]
+
+# ---------------------------------------------------------------- PL simple
+- id: pl-simple-01
+  question: Jakie zasady przetwarzania danych osobowych przewiduje RODO?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 5 RODO: zgodność z prawem, rzetelność i przejrzystość, ograniczenie
+    celu, minimalizacja danych, prawidłowość, ograniczenie przechowywania,
+    integralność i poufność oraz rozliczalność administratora.
+  relevant_document_ids: [gdpr_pl]
+  relevant_unit_ids: [gdpr_pl:art:5]
+
+- id: pl-simple-02
+  question: Jakie są podstawy prawne przetwarzania danych osobowych według RODO?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 6 ust. 1 RODO: zgoda, niezbędność do wykonania umowy, obowiązek
+    prawny, ochrona żywotnych interesów, zadanie publiczne oraz prawnie
+    uzasadnione interesy administratora.
+  relevant_document_ids: [gdpr_pl]
+  relevant_unit_ids: [gdpr_pl:art:6]
+
+- id: pl-simple-03
+  question: Kiedy przysługuje prawo do usunięcia danych („prawo do bycia zapomnianym")?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 17 RODO — m.in. gdy dane nie są już niezbędne, zgoda została cofnięta,
+    wniesiono sprzeciw albo dane przetwarzano niezgodnie z prawem; z wyjątkami
+    (np. wolność wypowiedzi, roszczenia prawne).
+  relevant_document_ids: [gdpr_pl]
+  relevant_unit_ids: [gdpr_pl:art:17]
+
+- id: pl-simple-04
+  question: Jakie administracyjne kary pieniężne przewiduje RODO?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 83 RODO: do 20 mln EUR lub 4% całkowitego rocznego światowego obrotu
+    (wyższa z kwot) za najpoważniejsze naruszenia; niższy próg to 10 mln EUR
+    lub 2%.
+  relevant_document_ids: [gdpr_pl]
+  relevant_unit_ids: [gdpr_pl:art:83]
+
+- id: pl-simple-05
+  question: W jakim terminie administrator musi zgłosić naruszenie ochrony danych organowi nadzorczemu?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 33 RODO: bez zbędnej zwłoki, w miarę możliwości nie później niż w
+    terminie 72 godzin po stwierdzeniu naruszenia.
+  relevant_document_ids: [gdpr_pl]
+  relevant_unit_ids: [gdpr_pl:art:33]
+
+- id: pl-simple-06
+  question: Kiedy trzeba przeprowadzić ocenę skutków dla ochrony danych (DPIA)?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 35 RODO: gdy przetwarzanie może powodować wysokie ryzyko — w
+    szczególności profilowanie na dużą skalę, przetwarzanie szczególnych
+    kategorii danych lub systematyczne monitorowanie miejsc publicznych.
+  relevant_document_ids: [gdpr_pl]
+  relevant_unit_ids: [gdpr_pl:art:35]
+
+- id: pl-simple-07
+  question: Ile dni urlopu wypoczynkowego przysługuje pracownikowi?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 154 Kodeksu pracy: 20 dni przy stażu pracy krótszym niż 10 lat, 26 dni
+    przy stażu co najmniej 10-letnim.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: [pl_labour_code:art:154]
+
+- id: pl-simple-08
+  question: Jakie elementy musi zawierać umowa o pracę?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 29 Kodeksu pracy: strony i rodzaj umowy, datę zawarcia oraz warunki
+    pracy i płacy — w tym rodzaj pracy, miejsce, wynagrodzenie, wymiar czasu
+    pracy i dzień rozpoczęcia.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: [pl_labour_code:art:29]
+
+- id: pl-simple-09
+  question: Jakie są okresy wypowiedzenia umowy o pracę zawartej na czas nieokreślony?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 36 Kodeksu pracy: 2 tygodnie przy zatrudnieniu krótszym niż 6
+    miesięcy, 1 miesiąc przy co najmniej 6 miesiącach, 3 miesiące przy co
+    najmniej 3 latach zatrudnienia.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: [pl_labour_code:art:36]
+
+- id: pl-simple-10
+  question: Na czym polega zasada równego traktowania w zatrudnieniu?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 18³a Kodeksu pracy: pracownicy powinni być równo traktowani w zakresie
+    nawiązania i rozwiązania stosunku pracy, warunków zatrudnienia i awansów,
+    bez dyskryminacji m.in. ze względu na płeć, wiek, niepełnosprawność,
+    religię czy orientację seksualną.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: ["pl_labour_code:art:18^3a"]
+
+- id: pl-simple-11
+  question: Jakich danych osobowych pracodawca może żądać od osoby ubiegającej się o zatrudnienie?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 22¹ Kodeksu pracy: imię (imiona) i nazwisko, data urodzenia, dane
+    kontaktowe, a gdy to niezbędne — wykształcenie, kwalifikacje zawodowe i
+    przebieg dotychczasowego zatrudnienia.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: ["pl_labour_code:art:22^1"]
+
+- id: pl-simple-12
+  question: Jaka jest podstawowa norma czasu pracy?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 129 Kodeksu pracy: czas pracy nie może przekraczać 8 godzin na dobę i
+    przeciętnie 40 godzin w przeciętnie pięciodniowym tygodniu pracy w
+    przyjętym okresie rozliczeniowym.
+  relevant_document_ids: [pl_labour_code]
+  relevant_unit_ids: [pl_labour_code:art:129]
+
+- id: pl-simple-13
+  question: Kto jest organem nadzorczym w sprawach ochrony danych osobowych w Polsce?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 34 ustawy o ochronie danych osobowych: organem nadzorczym jest Prezes
+    Urzędu Ochrony Danych Osobowych (Prezes UODO).
+  relevant_document_ids: [pl_data_protection_act]
+  relevant_unit_ids: [pl_data_protection_act:art:34]
+
+- id: pl-simple-14
+  question: Czy organy publiczne mają obowiązek wyznaczenia inspektora ochrony danych?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Tak — art. 8 i 9 ustawy o ochronie danych osobowych w związku z art. 37
+    RODO nakładają na organy i podmioty publiczne obowiązek wyznaczenia
+    inspektora ochrony danych.
+  relevant_document_ids: [pl_data_protection_act]
+  relevant_unit_ids: [pl_data_protection_act:art:8, pl_data_protection_act:art:9]
+
+- id: pl-simple-15
+  question: Jakie kary pieniężne grożą podmiotom publicznym za naruszenie przepisów o ochronie danych?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Art. 102 ustawy o ochronie danych osobowych ogranicza kary dla jednostek
+    sektora finansów publicznych — do 100 000 zł (a dla instytucji kultury do
+    10 000 zł).
+  relevant_document_ids: [pl_data_protection_act]
+  relevant_unit_ids: [pl_data_protection_act:art:102]
+
+- id: pl-simple-16
+  question: Kiedy według EROD model AI można uznać za anonimowy?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Według Opinii 28/2024 EROD model jest anonimowy tylko, gdy prawdopodobieństwo
+    bezpośredniego lub pośredniego wyodrębnienia danych osób, których dane
+    użyto do trenowania, oraz uzyskania ich danych przez zapytania, jest
+    nieistotne — ocenia się to indywidualnie, z uwzględnieniem wszystkich
+    rozsądnie dostępnych środków.
+  relevant_document_ids: [edpb_opinion_28_2024_pl]
+  relevant_unit_ids: []
+
+- id: pl-simple-17
+  question: Czy prawnie uzasadniony interes może być podstawą trenowania modeli AI na danych osobowych?
+  question_language: pl
+  difficulty: simple
+  ground_truth_answer: >
+    Opinia 28/2024 EROD dopuszcza art. 6 ust. 1 lit. f RODO jako podstawę, pod
+    warunkiem przejścia trzystopniowego testu: ustalenia prawnie uzasadnionego
+    interesu, niezbędności przetwarzania oraz wyważenia interesów z prawami
+    osób, których dane dotyczą.
+  relevant_document_ids: [edpb_opinion_28_2024_pl]
+  relevant_unit_ids: []
+
+# ----------------------------------------------------------- PL cross-lingual
+- id: pl-cross-01
+  question: Jakie praktyki w zakresie sztucznej inteligencji są zakazane w Unii Europejskiej?
+  question_language: pl
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Art. 5 aktu o AI (rozporządzenie 2024/1689) zakazuje m.in. technik
+    manipulacyjnych powodujących poważną szkodę, scoringu społecznego,
+    nieukierunkowanego scrapingu wizerunków twarzy, rozpoznawania emocji w
+    pracy i szkole oraz zdalnej identyfikacji biometrycznej w czasie
+    rzeczywistym w przestrzeni publicznej (z wąskimi wyjątkami).
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:5]
+
+- id: pl-cross-02
+  question: Jakie obowiązki przejrzystości mają podmioty wykorzystujące deepfake?
+  question_language: pl
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Art. 50 aktu o AI wymaga ujawnienia, że treść została sztucznie wygenerowana
+    lub zmanipulowana, oraz oznaczania treści syntetycznych w formacie
+    nadającym się do odczytu maszynowego.
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:50]
+
+- id: pl-cross-03
+  question: Od jakiego progu użytkowników platforma internetowa jest uznawana za bardzo dużą platformę (VLOP)?
+  question_language: pl
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Art. 33 aktu o usługach cyfrowych (DSA): próg to 45 mln średnich
+    miesięcznych aktywnych odbiorców usługi w UE; wyznaczenia dokonuje Komisja.
+  relevant_document_ids: [dsa_en]
+  relevant_unit_ids: [dsa_en:art:33]
+
+- id: pl-cross-04
+  question: Jakie prawa przysługują osobie, której dane dotyczą, według ukraińskiej ustawy o ochronie danych osobowych?
+  question_language: pl
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Стаття 8 ustawy № 2297-VI: prawo wiedzieć o przetwarzaniu, prawo dostępu do
+    danych, sprzeciwu, żądania sprostowania lub usunięcia, ochrony przed
+    bezprawnym przetwarzaniem oraz skargi do Rzecznika (Уповноважений) lub sądu.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:8]
+
+# --------------------------------------------------------------- PL multi-hop
+- id: pl-multi-01
+  question: Czy pracodawca może stosować monitoring wizyjny pracowników i jakie wymogi RODO musi przy tym spełnić?
+  question_language: pl
+  difficulty: multi-hop
+  ground_truth_answer: >
+    Art. 22² Kodeksu pracy dopuszcza monitoring dla zapewnienia bezpieczeństwa,
+    ochrony mienia, kontroli produkcji lub zachowania tajemnicy informacji;
+    cele i zakres określa się w układzie lub regulaminie, a przetwarzanie
+    nagrań musi spełniać zasady RODO, w tym art. 5 i 6.
+  relevant_document_ids: [pl_labour_code, gdpr_pl]
+  relevant_unit_ids: ["pl_labour_code:art:22^2", gdpr_pl:art:6]
+
+- id: pl-multi-02
+  question: Jakie obowiązki informacyjne ma administrator według RODO i jak EROD odnosi je do modeli AI?
+  question_language: pl
+  difficulty: multi-hop
+  ground_truth_answer: >
+    Art. 13 i 14 RODO wymagają poinformowania osoby o administratorze, celach,
+    podstawie prawnej i prawach; Opinia 28/2024 EROD podkreśla szczególne
+    znaczenie przejrzystości przy zbieraniu danych do trenowania modeli AI,
+    zwłaszcza przy web scrapingu.
+  relevant_document_ids: [gdpr_pl, edpb_opinion_28_2024_pl]
+  relevant_unit_ids: [gdpr_pl:art:13, gdpr_pl:art:14]
+
+# ---------------------------------------------------------------- UK simple
+- id: uk-simple-01
+  question: Які права має суб'єкт персональних даних?
+  question_language: uk
+  difficulty: simple
+  ground_truth_answer: >
+    Стаття 8 Закону № 2297-VI: право знати про обробку, отримувати доступ до
+    своїх даних, заперечувати проти обробки, вимагати виправлення або
+    видалення, на захист від незаконної обробки та на звернення до
+    Уповноваженого чи суду.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:8]
+
+- id: uk-simple-02
+  question: Що таке згода суб'єкта персональних даних і які вимоги до неї?
+  question_language: uk
+  difficulty: simple
+  ground_truth_answer: >
+    Стаття 2 визначає згоду як добровільне волевиявлення фізичної особи щодо
+    надання дозволу на обробку її даних; за статтею 11 згода є першою
+    підставою для обробки персональних даних.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:2, ua_data_protection_law:art:11]
+
+- id: uk-simple-03
+  question: Чи дозволена обробка даних про здоров'я чи біометричних даних?
+  question_language: uk
+  difficulty: simple
+  ground_truth_answer: >
+    Стаття 7 забороняє обробку даних про расове походження, політичні і
+    релігійні переконання, здоров'я, статеве життя, біометричних і генетичних
+    даних — крім визначених винятків, як-от однозначна згода або медична
+    необхідність.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:7]
+
+- id: uk-simple-04
+  question: Які підстави для обробки персональних даних передбачає закон України?
+  question_language: uk
+  difficulty: simple
+  ground_truth_answer: >
+    Стаття 11 Закону № 2297-VI: згода суб'єкта, дозвіл законом, укладення та
+    виконання правочину, захист життєво важливих інтересів, виконання
+    обов'язку володільця, законний інтерес — якщо не переважають права
+    суб'єкта.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:11]
+
+- id: uk-simple-05
+  question: Коли персональні дані підлягають видаленню або знищенню?
+  question_language: uk
+  difficulty: simple
+  ground_truth_answer: >
+    Стаття 15: дані видаляються або знищуються, зокрема, після закінчення
+    строку зберігання, при припиненні правовідносин, на підставі рішення суду
+    або вимоги суб'єкта, якщо обробка незаконна.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:15]
+
+- id: uk-simple-06
+  question: Які вимоги до передачі персональних даних іноземним суб'єктам?
+  question_language: uk
+  difficulty: simple
+  ground_truth_answer: >
+    Транскордонна передача можлива до держав із належним рівнем захисту
+    (зокрема держав ЄЕП та сторін Конвенції 108); в інших випадках — за
+    однозначної згоди суб'єкта чи інших визначених підстав.
+  relevant_document_ids: [ua_data_protection_law]
+  relevant_unit_ids: [ua_data_protection_law:art:29]
+
+# ----------------------------------------------------------- UK cross-lingual
+- id: uk-cross-01
+  question: Які системи штучного інтелекту заборонені в ЄС?
+  question_language: uk
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Стаття 5 Регламенту (ЄС) 2024/1689 (AI Act) забороняє, серед іншого,
+    маніпулятивні техніки, соціальний скоринг, нецільовий збір зображень
+    облич, розпізнавання емоцій на роботі та в школах і дистанційну біометричну
+    ідентифікацію в реальному часі у публічних місцях (з вузькими винятками).
+  relevant_document_ids: [eu_ai_act_2024]
+  relevant_unit_ids: [eu_ai_act_2024:art:5]
+
+- id: uk-cross-02
+  question: Які штрафи передбачає GDPR за порушення захисту даних?
+  question_language: uk
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Стаття 83 GDPR: до 20 млн євро або 4% загального світового річного
+    обороту (більша з сум) за найсерйозніші порушення; нижчий рівень — 10 млн
+    євро або 2%.
+  relevant_document_ids: [gdpr_en, gdpr_pl]
+  relevant_unit_ids: [gdpr_en:art:83, gdpr_pl:art:83]
+
+- id: uk-cross-03
+  question: Протягом якого строку треба повідомити про витік персональних даних за GDPR?
+  question_language: uk
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Стаття 33 GDPR: без невиправданої затримки і, де можливо, не пізніше ніж
+    через 72 години після виявлення порушення.
+  relevant_document_ids: [gdpr_en, gdpr_pl]
+  relevant_unit_ids: [gdpr_en:art:33, gdpr_pl:art:33]
+
+- id: uk-cross-04
+  question: Які обов'язки щодо оцінки ризиків мають дуже великі онлайн-платформи за DSA?
+  question_language: uk
+  difficulty: cross-lingual
+  ground_truth_answer: >
+    Стаття 34 DSA зобов'язує дуже великі платформи щонайменше раз на рік
+    оцінювати системні ризики — поширення незаконного контенту, вплив на
+    основоположні права, виборчі процеси, здоров'я та неповнолітніх.
+  relevant_document_ids: [dsa_en]
+  relevant_unit_ids: [dsa_en:art:34, dsa_en:art:33]
+
+# --------------------------------------------------------------- UK multi-hop
+- id: uk-multi-01
+  question: Порівняйте права суб'єкта даних за українським законом і за GDPR.
+  question_language: uk
+  difficulty: multi-hop
+  ground_truth_answer: >
+    Стаття 8 Закону № 2297-VI надає права на інформацію, доступ, заперечення,
+    виправлення і видалення; GDPR у статті 15 (та статтях 16–21) додає ширші
+    права — переносимість даних, обмеження обробки і детальні обов'язки
+    інформування.
+  relevant_document_ids: [ua_data_protection_law, gdpr_en, gdpr_pl]
+  relevant_unit_ids: [ua_data_protection_law:art:8, gdpr_en:art:15, gdpr_pl:art:15]
