@@ -41,8 +41,10 @@ def test_score_retrieval_doc_level_only():
 
 def test_percentile():
     values = list(map(float, range(1, 101)))
-    assert percentile(values, 50) == 50.0
-    assert percentile(values, 95) == 94.0  # nearest-rank on 0-based index
+    # nearest-rank: round(p/100 * (n-1)) as 0-based index
+    assert percentile(values, 50) == 51.0
+    assert percentile(values, 95) == 95.0
+    assert percentile([1.0], 95) == 1.0
     assert percentile([], 95) == 0.0
 
 
