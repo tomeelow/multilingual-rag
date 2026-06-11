@@ -1,0 +1,24 @@
+# Data — source PDFs and derived artifacts never go into the main tree
+data/
+qdrant_storage/
+indexes/
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Caches / local state
+*.sqlite3
+.cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# Model downloads
+.models/
