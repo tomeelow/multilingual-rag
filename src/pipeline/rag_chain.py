@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from src.config import pipeline_config
 from src.language import detect_language
 from src.models import Chunk
+from src.pipeline.hyde import hyde_query_vector
 from src.pipeline.llm import LLMClient, get_llm
 from src.pipeline.prompts import build_prompt
 from src.pipeline.rerank import Reranker, get_reranker
@@ -74,12 +75,18 @@ class RAGPipeline:
         self.gen_cfg = pipeline_config()["generation"]
 
     def retrieve(
-        self, query: str, language: str, cross_lingual: bool
+        self, query: str, language: str, cross_lingual: bool, use_hyde: bool = False
     ) -> tuple[list[Chunk], list[Chunk], int, int]:
         """-> (reranked child chunks, parent context chunks,
         retrieval_ms, rerank_ms)"""
         t0 = time.perf_counter()
-        candidates = self.retriever.hybrid(query, language=language, cross_lingual=cross_lingual)
+        # HyDE replaces the dense query vector only; BM25 keeps the raw query
+        # and the reranker scores against the real query, so a hallucinated
+        # hypothesis cannot poison the lexical leg or the final ranking
+        query_vector = hyde_query_vector(query, self.llm) if use_hyde else None
+        candidates = self.retriever.hybrid(
+            query, language=language, cross_lingual=cross_lingual, query_vector=query_vector
+        )
         t1 = time.perf_counter()
         top_children = self.reranker.rerank(query, candidates)
         t2 = time.perf_counter()
@@ -91,10 +98,13 @@ class RAGPipeline:
         query: str,
         filter_language: str | None = None,
         cross_lingual: bool = False,
+        use_hyde: bool = False,
     ) -> RAGResponse:
         t0 = time.perf_counter()
         language = filter_language or detect_language(query)
-        children, parents, retrieval_ms, rerank_ms = self.retrieve(query, language, cross_lingual)
+        children, parents, retrieval_ms, rerank_ms = self.retrieve(
+            query, language, cross_lingual, use_hyde
+        )
         t1 = time.perf_counter()
         result = self.llm.complete(
             build_prompt(query, parents),
@@ -121,12 +131,15 @@ class RAGPipeline:
         query: str,
         filter_language: str | None = None,
         cross_lingual: bool = False,
+        use_hyde: bool = False,
     ) -> Iterator[dict[str, Any]]:
         """Yields {"token": str} events, then one final {"done": True, ...}
         event with sources and latency metadata."""
         t0 = time.perf_counter()
         language = filter_language or detect_language(query)
-        children, parents, retrieval_ms, rerank_ms = self.retrieve(query, language, cross_lingual)
+        children, parents, retrieval_ms, rerank_ms = self.retrieve(
+            query, language, cross_lingual, use_hyde
+        )
         t1 = time.perf_counter()
         for token in self.llm.stream(
             build_prompt(query, parents),
