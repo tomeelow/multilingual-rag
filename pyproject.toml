@@ -22,7 +22,6 @@ dependencies = [
     # api
     "fastapi>=0.115",
     "uvicorn>=0.32",
-    "sse-starlette>=2.1",
     # frontend
     "streamlit>=1.40",
     "httpx>=0.27",
