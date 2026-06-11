@@ -45,7 +45,8 @@ def validate() -> int:
 
     chunks_path = DATA_PROCESSED / "chunks.json"
     if chunks_path.exists():
-        chunks = json.loads(chunks_path.read_text())
+        # bounds apply to retrieval (child) chunks; parents are ≤1024 tokens by design
+        chunks = [c for c in json.loads(chunks_path.read_text()) if c["chunk_type"] == "child"]
         short = [c["chunk_id"] for c in chunks if len(c["text"]) < CHUNK_MIN_CHARS]
         long_ = [c["chunk_id"] for c in chunks if len(c["text"]) > CHUNK_MAX_CHARS]
         print(

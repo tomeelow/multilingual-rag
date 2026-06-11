@@ -41,3 +41,38 @@ class Unit:
 
     def to_json(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class Chunk:
+    """One indexable chunk. Children (256 tokens) are what retrieval scores;
+    parents (a full article, ≤1024 tokens) are what the LLM reads. Every chunk
+    carries full provenance — without it citations cannot be reconstructed."""
+
+    chunk_id: str  # "gdpr_en:art:6:c0"
+    parent_id: str  # the parent chunk this child belongs to (parents: itself)
+    chunk_type: str  # "parent" | "child"
+    text: str
+    token_count: int
+    # provenance
+    source_id: str
+    doc_title: str
+    language: str
+    jurisdiction: str
+    doc_type: str
+    official: bool
+    url: str
+    ingestion_date: str
+    # citation
+    kind: str  # unit kind: "recital" | "article" | "annex" | "paragraph" | "document"
+    article_number: str | None  # raw number: "6", "18³", "8-1", "III"
+    ref: str | None  # display citation: "Article 6", "Motyw 14", "Стаття 8"
+    section_title: str | None
+    pages: list[int] = field(default_factory=list)
+
+    def to_json(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_json(cls, d: dict[str, Any]) -> "Chunk":
+        return cls(**d)

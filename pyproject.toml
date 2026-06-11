@@ -53,6 +53,7 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["notebooks"]  # notebooks are scratch space, not production code
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
