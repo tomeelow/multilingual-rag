@@ -17,6 +17,7 @@ from src.models import Chunk
 from src.pipeline.hyde import hyde_query_vector
 from src.pipeline.llm import LLMClient, get_llm
 from src.pipeline.prompts import build_prompt
+from src.pipeline.query_analysis import in_article_range, parse_article_range
 from src.pipeline.rerank import Reranker, get_reranker
 from src.pipeline.retriever import Retriever, get_retriever
 
@@ -116,10 +117,44 @@ class RAGPipeline:
             query, language=language, cross_lingual=cross_lingual, query_vector=query_vector
         )
         t1 = time.perf_counter()
-        top_children = self.reranker.rerank(query, candidates)
+        article_range = parse_article_range(query)
+        if article_range:
+            lang_filter = None if cross_lingual else language  # mirrors Retriever.hybrid
+            top_children = self._rerank_within_range(query, candidates, article_range, lang_filter)
+        else:
+            top_children = self.reranker.rerank(query, candidates)
         t2 = time.perf_counter()
         parents = self.retriever.parents_of(top_children)
         return top_children, parents, int((t1 - t0) * 1000), int((t2 - t1) * 1000)
+
+    def _rerank_within_range(
+        self,
+        query: str,
+        candidates: list[Chunk],
+        article_range: tuple[int, int],
+        language: str | None,
+    ) -> list[Chunk]:
+        """An explicit range ("art. 10–18") is a hard constraint the
+        semantic legs cannot honor: in-range articles missing from the
+        candidates are injected from metadata, and out-of-range candidates
+        can only fill leftover slots, never outrank in-range ones."""
+        lo, hi = article_range
+        in_range = [c for c in candidates if in_article_range(c, lo, hi)]
+        seen_sources: list[str] = []
+        for c in candidates:
+            if c.source_id not in seen_sources:
+                seen_sources.append(c.source_id)
+        seen_ids = {c.chunk_id for c in in_range}
+        injected = [
+            c
+            for c in self.retriever.children_in_range(lo, hi, language, seen_sources)
+            if c.chunk_id not in seen_ids
+        ]
+        top = self.reranker.rerank(query, in_range + injected)
+        if len(top) < self.reranker.final_k:
+            out_of_range = [c for c in candidates if not in_article_range(c, lo, hi)]
+            top += self.reranker.rerank(query, out_of_range, top_k=self.reranker.final_k - len(top))
+        return top
 
     def answer(
         self,

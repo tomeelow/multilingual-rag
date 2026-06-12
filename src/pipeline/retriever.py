@@ -12,6 +12,7 @@ from functools import lru_cache
 from src.config import pipeline_config
 from src.ingestion.chunker import load_chunks
 from src.models import Chunk
+from src.pipeline.query_analysis import article_base_number
 from src.retrieval import qdrant_store
 from src.retrieval.bm25_index import BM25Index
 from src.retrieval.embedding import get_embedder
@@ -74,6 +75,40 @@ class Retriever:
         sparse = self.bm25(query, k, lang_filter)
         fused = rrf_fuse([dense, sparse], self.rrf_k)
         return [self._children[cid] for cid, _ in fused[:k]]
+
+    def children_in_range(
+        self,
+        lo: int,
+        hi: int,
+        language: str | None = None,
+        prefer_sources: list[str] | None = None,
+        limit: int = 40,
+    ) -> list[Chunk]:
+        """All child article chunks with base number in [lo, hi], straight
+        from metadata — articles the semantic legs missed must still enter
+        the rerank pool when the query names an explicit range.
+
+        `prefer_sources` orders the result (documents the query already
+        retrieves first), so the `limit` cut drops the least likely
+        documents, not arbitrary ones.
+        """
+        matches = [
+            c
+            for c in self._children.values()
+            if c.kind == "article"
+            and (base := article_base_number(c.article_number)) is not None
+            and lo <= base <= hi
+            and (language is None or c.language == language)
+        ]
+        rank = {s: i for i, s in enumerate(prefer_sources or [])}
+        matches.sort(
+            key=lambda c: (
+                rank.get(c.source_id, len(rank)),
+                article_base_number(c.article_number),
+                c.chunk_id,
+            )
+        )
+        return matches[:limit]
 
     def parents_of(self, children: list[Chunk]) -> list[Chunk]:
         """Parent context chunks, deduplicated, in child-ranking order."""

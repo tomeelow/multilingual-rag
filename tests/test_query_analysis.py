@@ -1,7 +1,13 @@
 """Query-analysis heuristics: rights/duties intent and rerank weighting."""
 
 from src.models import Chunk
-from src.pipeline.query_analysis import detect_rights_duties_intent, intent_weight
+from src.pipeline.query_analysis import (
+    article_base_number,
+    detect_rights_duties_intent,
+    in_article_range,
+    intent_weight,
+    parse_article_range,
+)
 
 
 def _chunk(**kw) -> Chunk:
@@ -70,3 +76,39 @@ def test_obligation_language_in_text_is_mildly_demoted():
 def test_no_intent_no_adjustment():
     c = _chunk(section_title="Rozdział II — Obowiązki pracownika")
     assert intent_weight(None, c) == 1.0
+
+
+def test_parse_article_range_variants():
+    assert parse_article_range("prawa z art. 10–18 Kodeksu pracy") == (10, 18)
+    assert parse_article_range("art. 10-18") == (10, 18)  # ASCII hyphen
+    assert parse_article_range("artykuły 5–7 RODO") == (5, 7)
+    assert parse_article_range("Articles 12–22 of the GDPR") == (12, 22)
+    assert parse_article_range("статті 6–8 Закону") == (6, 8)
+    # superscript suffix on a bound is consumed, base numbers returned
+    assert parse_article_range("art. 18–18³ Kodeksu pracy") == (18, 18)
+    # reversed bounds normalize
+    assert parse_article_range("art. 18–10") == (10, 18)
+
+
+def test_parse_article_range_absent():
+    assert parse_article_range("Jakie są podstawowe prawa pracownika?") is None
+    # a bare number range without an article token is not a legal reference
+    assert parse_article_range("w latach 2016-2018") is None
+    # single article mention is not a range
+    assert parse_article_range("co mówi art. 100 Kodeksu pracy?") is None
+
+
+def test_article_base_number():
+    assert article_base_number("10") == 10
+    assert article_base_number("11¹") == 11
+    assert article_base_number("18³a") == 18
+    assert article_base_number("8-1") == 8  # UA inserted-article numbering
+    assert article_base_number("III") is None  # roman annex numbers
+    assert article_base_number(None) is None
+
+
+def test_in_article_range_checks_kind_and_base():
+    assert in_article_range(_chunk(article_number="11¹"), 10, 18)
+    assert not in_article_range(_chunk(article_number="100"), 10, 18)
+    # recital 14 is not article 14
+    assert not in_article_range(_chunk(kind="recital", article_number="14"), 10, 18)

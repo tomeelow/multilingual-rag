@@ -8,6 +8,8 @@ chapter on a *rights* question because the embedding only sees topical
 closeness, not polarity.
 """
 
+import re
+
 from src.models import Chunk
 
 # Stems, matched as lowercase substrings so one list covers inflected forms
@@ -41,6 +43,43 @@ _DUTIES_TERMS = (
 _OPPOSING_SECTION_WEIGHT = 0.35
 _ALIGNED_SECTION_WEIGHT = 1.25
 _OPPOSING_TEXT_WEIGHT = 0.7
+
+
+# "art. 10–18", "artykuły 10-18", "articles 10–18", "ст. 10–18",
+# "статті 10–18". Superscript/letter suffixes on the bounds ("18³a") are
+# consumed but ignored — ranges are resolved at base-article granularity.
+_ARTICLE_RANGE = re.compile(
+    r"(?:art(?:ykuł\w*|icles?)?|ст(?:атт\w*)?)\s*\.?\s*"
+    r"(\d+)[\w¹²³⁴⁵⁶⁷⁸⁹⁰]*\s*[–—−-]\s*(\d+)[\w¹²³⁴⁵⁶⁷⁸⁹⁰]*",
+    re.IGNORECASE,
+)
+
+_LEADING_DIGITS = re.compile(r"\d+")
+
+
+def parse_article_range(query: str) -> tuple[int, int] | None:
+    """Explicit article range in the query -> (lo, hi) base numbers."""
+    m = _ARTICLE_RANGE.search(query)
+    if not m:
+        return None
+    lo, hi = int(m.group(1)), int(m.group(2))
+    return (lo, hi) if lo <= hi else (hi, lo)
+
+
+def article_base_number(article_number: str | None) -> int | None:
+    """Base integer of an article number: '11¹' -> 11, '18³a' -> 18,
+    '8-1' -> 8 (UA inserted article). Roman annex numbers -> None."""
+    if not article_number:
+        return None
+    m = _LEADING_DIGITS.match(article_number)
+    return int(m.group()) if m else None
+
+
+def in_article_range(chunk: Chunk, lo: int, hi: int) -> bool:
+    if chunk.kind != "article":
+        return False
+    base = article_base_number(chunk.article_number)
+    return base is not None and lo <= base <= hi
 
 
 def _has_rights(text: str) -> bool:
