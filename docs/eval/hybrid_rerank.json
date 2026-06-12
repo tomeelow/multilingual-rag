@@ -2,28 +2,28 @@
   "config": "hybrid_rerank",
   "overall": {
     "n": 57,
-    "doc_hit@5": 0.807,
-    "doc_recall@5": 0.76,
-    "unit_hit@5": 0.655,
-    "unit_recall@5": 0.606,
-    "mrr": 0.526
+    "doc_hit@5": 0.86,
+    "doc_recall@5": 0.813,
+    "unit_hit@5": 0.782,
+    "unit_recall@5": 0.724,
+    "mrr": 0.675
   },
   "by_difficulty": {
     "simple": {
       "n": 41,
-      "doc_hit@5": 0.976,
-      "doc_recall@5": 0.976,
-      "unit_hit@5": 0.821,
-      "unit_recall@5": 0.808,
-      "mrr": 0.669
+      "doc_hit@5": 0.951,
+      "doc_recall@5": 0.951,
+      "unit_hit@5": 0.897,
+      "unit_recall@5": 0.872,
+      "mrr": 0.772
     },
     "cross-lingual": {
       "n": 11,
-      "doc_hit@5": 0.091,
-      "doc_recall@5": 0.091,
-      "unit_hit@5": 0.0,
-      "unit_recall@5": 0.0,
-      "mrr": 0.0
+      "doc_hit@5": 0.455,
+      "doc_recall@5": 0.455,
+      "unit_hit@5": 0.364,
+      "unit_recall@5": 0.364,
+      "mrr": 0.318
     },
     "multi-hop": {
       "n": 5,
@@ -31,7 +31,7 @@
       "doc_recall@5": 0.467,
       "unit_hit@5": 0.8,
       "unit_recall@5": 0.367,
-      "mrr": 0.567
+      "mrr": 0.7
     }
   },
   "by_language": {
@@ -39,29 +39,29 @@
       "n": 23,
       "doc_hit@5": 0.913,
       "doc_recall@5": 0.87,
-      "unit_hit@5": 0.826,
-      "unit_recall@5": 0.761,
-      "mrr": 0.699
+      "unit_hit@5": 0.87,
+      "unit_recall@5": 0.804,
+      "mrr": 0.733
     },
     "pl": {
       "n": 23,
-      "doc_hit@5": 0.783,
-      "doc_recall@5": 0.739,
-      "unit_hit@5": 0.524,
-      "unit_recall@5": 0.5,
-      "mrr": 0.413
+      "doc_hit@5": 0.826,
+      "doc_recall@5": 0.783,
+      "unit_hit@5": 0.714,
+      "unit_recall@5": 0.667,
+      "mrr": 0.583
     },
     "uk": {
       "n": 11,
-      "doc_hit@5": 0.636,
-      "doc_recall@5": 0.576,
-      "unit_hit@5": 0.545,
-      "unit_recall@5": 0.485,
-      "mrr": 0.379
+      "doc_hit@5": 0.818,
+      "doc_recall@5": 0.758,
+      "unit_hit@5": 0.727,
+      "unit_recall@5": 0.667,
+      "mrr": 0.727
     }
   },
   "latency_ms": {
-    "p50": 352.6,
-    "p95": 682.9
+    "p50": 6503.3,
+    "p95": 8480.1
   }
 }

@@ -92,18 +92,16 @@ scored with deterministic retrieval metrics — full tables in
 
 | Configuration | unit hit@5 | MRR | retrieval p95 |
 |---|---|---|---|
-| dense only | 0.727 | 0.544 | 107 ms |
-| dense + BM25 (RRF) | 0.673 | 0.487 | 64 ms |
-| hybrid + cross-encoder rerank | 0.655 | 0.526 | 683 ms |
+| dense only | 0.727 | 0.544 | 132 ms |
+| dense + BM25 (RRF) | 0.673 | 0.487 | 101 ms |
+| hybrid + multilingual rerank | 0.782 | 0.675 | 8,480 ms |
 | hybrid + rerank + HyDE | *needs LLM key* | — | — |
 
-The interesting result is in the breakdown: for **English** queries the
-reranked pipeline is clearly best (hit@5 0.826, MRR 0.699), but the pinned
-`ms-marco-MiniLM` cross-encoder is English-trained and drives
-**cross-lingual** hit@5 to **0.0** — it demotes every correct
-foreign-language passage that dense retrieval had found. Honest numbers over
-a tidy story; the fix (a multilingual reranker) is top of the
-[more-time list](#what-i-would-do-with-more-time). ragas generation metrics
+An initial evaluation exposed that the English-only `ms-marco-MiniLM`
+cross-encoder removed correct foreign-language passages from cross-lingual
+results. The production pipeline now uses the multilingual
+`BAAI/bge-reranker-v2-m3`; current measurements are recorded in
+[docs/eval/results.md](docs/eval/results.md). ragas generation metrics
 (faithfulness, answer relevancy, …) are wired in and run with
 `uv run python -m src.eval.run_eval --ragas` once an LLM key is configured.
 
@@ -125,7 +123,7 @@ uv sync
 uv run python -m src.bootstrap                 # parse + chunk + index (embedded Qdrant)
 uv run uvicorn src.api.main:app --port 8000    # terminal 1
 uv run streamlit run frontend/app.py           # terminal 2
-uv run pytest                                  # 46 tests
+uv run pytest                                  # 47 tests
 ```
 
 Without an OpenAI or Anthropic API key, the app automatically runs in
@@ -160,12 +158,11 @@ phase status reports in [docs/phases/](docs/phases/).
 
 ## What I would do with more time
 
-- **Swap in a multilingual cross-encoder** (`bge-reranker-v2-m3`) — the
-  evaluation shows the English-only reranker erases cross-lingual gains, the
-  single biggest measured weakness.
 - **Language-aware RRF weighting** — BM25 contributes only same-language
   candidates, so its fusion weight should drop when the query targets
   other-language documents.
+- **Distil the multilingual reranker** — `bge-reranker-v2-m3` fixes the
+  cross-lingual relevance failure but is the dominant local retrieval cost.
 - **Paragraph-level citations** (Art. 6 ust. 1 lit. f / Стаття 8 ч. 2) —
   metadata currently stops at article level; statutory paragraph anchors
   would make citations directly pasteable into legal work.

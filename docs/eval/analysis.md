@@ -6,24 +6,26 @@ Numbers below from the 2026-06-11 run, 57-item golden set, open corpus
 (`cross_lingual=True` for all items — the hardest setting, where every query
 competes against all 3,710 chunks in three languages).
 
-## Headline finding: the English cross-encoder is a net negative outside English
+## Headline finding: a multilingual reranker fixes the cross-language failure
 
-`cross-encoder/ms-marco-MiniLM-L-6-v2` (pinned by the plan) is trained on
-English MS MARCO. The ablation makes its behavior precise:
+The original `cross-encoder/ms-marco-MiniLM-L-6-v2` is trained on English
+MS MARCO. It drove cross-lingual unit hit@5 to **0.0** by demoting correct
+foreign-language passages that multilingual E5 had retrieved.
 
-- **English queries:** reranking is the best configuration — unit hit@5
-  0.826, MRR 0.699 (vs 0.783/0.523 dense-only). This is the precision boost
-  reranking is supposed to buy.
-- **Cross-lingual items:** unit hit@5 drops to **0.0**. The reranker
-  systematically demotes correct foreign-language passages that dense
-  retrieval had surfaced — it cannot score a Ukrainian question against an
-  English statute, so correct candidates lose to same-language noise.
-- **Polish/Ukrainian queries overall:** hit@5 falls from 0.667/0.727 (dense)
-  to 0.524/0.545 (reranked).
+The production pipeline now uses `BAAI/bge-reranker-v2-m3`. On the same
+57-item golden set:
 
-The production default keeps the plan's pipeline, but the right fix is a
-multilingual cross-encoder (e.g. `bge-reranker-v2-m3`) — first item under
-"what I would do with more time".
+- **Overall:** unit hit@5 improves from 0.655 to **0.782**, and MRR from
+  0.526 to **0.675**.
+- **Cross-lingual items:** unit hit@5 improves from 0.0 to **0.364**.
+- **Polish queries:** hit@5 improves from 0.524 to **0.714**.
+- **Ukrainian queries:** MRR improves from 0.379 to **0.727**.
+- **English queries:** hit@5 also improves, from 0.826 to **0.870**.
+
+For the concrete Ukrainian query asking which AI systems are prohibited in
+the EU, dense retrieval and RRF both ranked AI Act Article 5 first. The old
+reranker removed every AI Act chunk from its top 10; the multilingual model
+ranks Article 5 first.
 
 ## Second finding: naive RRF fusion dilutes cross-lingual retrieval
 
@@ -35,11 +37,11 @@ chunks, and fusing them pushes correct dense hits out of the top 5. ADR-3's
 not complementary — it is noise. A language-aware fusion weight would be the
 refinement.
 
-## Where reranking unambiguously helps
+## Where reranking helps
 
-Multi-hop questions: hit@5 doubles (0.4 → 0.8, MRR 0.4 → 0.567). When the
+Multi-hop questions: hit@5 doubles (0.4 → 0.8, MRR 0.4 → 0.7). When the
 top-20 candidate pool spans two documents, the cross-encoder is good at
-pulling both relevant articles into the top 5 — for English-language pairs.
+pulling relevant articles into the top 5.
 
 ## Latency
 
@@ -47,14 +49,15 @@ Retrieval-side p50/p95 (M-series laptop, MPS embeddings):
 
 | stage | p50 | p95 |
 |---|---|---|
-| dense | 60 ms | 107 ms |
-| hybrid (RRF) | 54 ms | 64 ms |
-| hybrid + rerank | 353 ms | 683 ms |
+| dense | 91 ms | 132 ms |
+| hybrid (RRF) | 91 ms | 101 ms |
+| hybrid + multilingual rerank | 6,503 ms | 8,480 ms |
 
-Reranking dominates retrieval latency but stays well inside the < 3 s
-end-to-end target; time-to-first-token depends on the generation model and
-needs an API key to measure (the harness records generation token counts and
-cost when run with `--ragas`).
+The multilingual reranker fixes relevance but is now the dominant local
+latency cost and exceeds the original <3 s target on CPU. A distilled
+multilingual reranker or GPU-backed serving is the next performance task.
+Time-to-first-token still depends on the generation model and needs an API
+key to measure.
 
 ## What the numbers do *not* show yet
 

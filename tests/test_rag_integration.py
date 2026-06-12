@@ -35,8 +35,14 @@ class _FakeLLM(LLMClient):
 @pytest.fixture(scope="module")
 def pipeline(tmp_path_factory):
     from src.pipeline.rag_chain import RAGPipeline
+    from src.pipeline.retriever import get_retriever
+    from src.retrieval.qdrant_store import get_client
 
-    return RAGPipeline(llm=_FakeLLM(tmp_path_factory.mktemp("cache")))
+    instance = RAGPipeline(llm=_FakeLLM(tmp_path_factory.mktemp("cache")))
+    yield instance
+    get_client().close()
+    get_client.cache_clear()
+    get_retriever.cache_clear()
 
 
 def test_answer_polish_query(pipeline):
@@ -62,9 +68,8 @@ def test_cross_lingual_flag_controls_language_filter(pipeline):
 def test_cross_lingual_answer_language_follows_query(pipeline):
     r = pipeline.answer("Які системи штучного інтелекту заборонені в ЄС?", cross_lingual=True)
     assert r.language == "uk"
-    assert r.sources  # NOTE: the pinned ms-marco reranker is English-trained;
-    # whether EN sources survive reranking for UK queries is measured in Phase 8,
-    # not asserted here
+    assert any(s.source_id == "eu_ai_act_2024" for s in r.sources)
+    assert any(s.ref == "Article 5" for s in r.sources)
 
 
 def test_stream_answer_events(pipeline):

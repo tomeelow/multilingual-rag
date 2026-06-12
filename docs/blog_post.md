@@ -43,10 +43,10 @@ hits the right article in the top five 83% of the time. But the stock
 reranker (`ms-marco-MiniLM`, pinned in every RAG tutorial) is trained only
 on English — and on cross-lingual questions it took accuracy to **zero**,
 systematically demoting every correct foreign-language passage that dense
-retrieval had surfaced. The component that adds the most precision
-monolingually is the one that erases cross-linguality. If your RAG system is
-multilingual, your reranker has to be too — and you will only ever learn
-that from an evaluation set built to catch it.
+retrieval had surfaced. Replacing it with `bge-reranker-v2-m3` raised
+overall unit hit@5 from 0.655 to 0.782 and cross-lingual hit@5 from 0.0 to
+0.364. If your RAG system is multilingual, your reranker has to be too —
+and you will only ever learn that from an evaluation set built to catch it.
 
 Everything is reproducible: `docker compose up` bootstraps the whole stack —
 parses the PDFs, builds both indexes, starts the API and UI — with no manual
