@@ -131,7 +131,7 @@ def load_chunks(chunk_type: str | None = None) -> list[Chunk]:
     return [Chunk.from_json(c) for c in raw if chunk_type in (None, c["chunk_type"])]
 
 
-if __name__ == "__main__":
+def write_chunks() -> list[Chunk]:
     from collections import Counter
 
     from loguru import logger
@@ -143,3 +143,8 @@ if __name__ == "__main__":
     by_lang = Counter(f"{c.language}/{c.chunk_type}" for c in chunks)
     logger.info("wrote {} chunks to {} — {}", len(chunks), out, dict(by_type))
     logger.info("per language: {}", dict(sorted(by_lang.items())))
+    return chunks
+
+
+if __name__ == "__main__":
+    write_chunks()

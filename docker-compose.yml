@@ -1,3 +1,8 @@
+# Full stack: docker compose up
+# First run: the one-shot `indexer` parses the PDFs in data/raw, chunks them,
+# and populates Qdrant + BM25 (model downloads cached in the hf_cache volume).
+# Subsequent runs skip everything that already exists. No manual steps.
+
 services:
   qdrant:
     image: qdrant/qdrant:v1.13.4
@@ -5,8 +10,72 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
-  # api and frontend services are added in Phase 9 (docker/api, docker/frontend)
+  indexer:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    command: ["python", "-m", "src.bootstrap"]
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    volumes:
+      - ./data:/app/data
+      - ./indexes:/app/indexes
+      - hf_cache:/root/.cache/huggingface
+    depends_on:
+      qdrant:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    env_file:
+      - path: .env
+        required: false # generation needs an LLM key; retrieval works without
+    volumes:
+      - ./data:/app/data
+      - ./indexes:/app/indexes
+      - hf_cache:/root/.cache/huggingface
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      indexer:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   qdrant_data:
+  hf_cache:

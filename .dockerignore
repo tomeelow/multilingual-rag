@@ -1,0 +1,14 @@
+.git
+.venv
+.cache
+.pytest_cache
+.ruff_cache
+data
+indexes
+qdrant_storage
+notebooks
+docs
+tests
+*.sqlite3
+.env
+.DS_Store

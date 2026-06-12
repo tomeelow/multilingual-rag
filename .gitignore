@@ -1,10 +1,16 @@
 # Data — source PDFs and derived artifacts never go into the main tree
-data/
+# (data/README.md stays tracked: it documents how to obtain the corpus)
+data/raw/
+data/processed/
 qdrant_storage/
 indexes/
 
 # Secrets
 .env
+
+# Assistant-local files
+CLAUDE.md
+.claude/
 
 # Python
 __pycache__/
