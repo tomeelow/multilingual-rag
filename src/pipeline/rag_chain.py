@@ -17,7 +17,12 @@ from src.models import Chunk
 from src.pipeline.hyde import hyde_query_vector
 from src.pipeline.llm import LLMClient, get_llm
 from src.pipeline.prompts import build_prompt
-from src.pipeline.query_analysis import in_article_range, parse_article_range
+from src.pipeline.query_analysis import (
+    comparative_source_groups,
+    detect_comparative_intent,
+    in_article_range,
+    parse_article_range,
+)
 from src.pipeline.rerank import Reranker, get_reranker
 from src.pipeline.retriever import Retriever, get_retriever
 
@@ -75,6 +80,17 @@ def _retrieval_only_text(language: str, parents: list[Chunk]) -> str:
     return "\n\n".join(blocks)
 
 
+def _diversify(ranked: list[Chunk], final_k: int) -> list[Chunk]:
+    """Top final_k by rank, but if they all share one source and another
+    source exists further down, its best chunk takes the last slot."""
+    top = ranked[:final_k]
+    sources = {c.source_id for c in top}
+    if len(sources) > 1 or len(ranked) <= len(top):
+        return top
+    other = next((c for c in ranked[final_k:] if c.source_id not in sources), None)
+    return top[:-1] + [other] if other else top
+
+
 def _sources(parents: list[Chunk]) -> list[Source]:
     return [
         Source(
@@ -118,14 +134,49 @@ class RAGPipeline:
         )
         t1 = time.perf_counter()
         article_range = parse_article_range(query)
-        if article_range:
+        source_groups = comparative_source_groups(query)
+        if article_range:  # the most explicit constraint wins
             lang_filter = None if cross_lingual else language  # mirrors Retriever.hybrid
             top_children = self._rerank_within_range(query, candidates, article_range, lang_filter)
+        elif source_groups:
+            top_children = self._retrieve_comparative(query, source_groups, query_vector)
+        elif detect_comparative_intent(query):
+            # comparative phrasing without recognizable document names:
+            # at least keep the result set from collapsing to one source
+            ranked = self.reranker.rerank(query, candidates, top_k=len(candidates))
+            top_children = _diversify(ranked, self.reranker.final_k)
         else:
             top_children = self.reranker.rerank(query, candidates)
         t2 = time.perf_counter()
         parents = self.retriever.parents_of(top_children)
         return top_children, parents, int((t1 - t0) * 1000), int((t2 - t1) * 1000)
+
+    def _retrieve_comparative(
+        self, query: str, source_groups: list[list[str]], query_vector: list[float] | None
+    ) -> list[Chunk]:
+        """Per-side retrieval for comparative queries ("GDPR vs Ukrainian
+        law"): one retrieval over the whole corpus returns only the dominant
+        side, and an answer comparing X and Y needs material from both.
+
+        Each named document group is retrieved and reranked on its own, then
+        the sides are interleaved in mention order. No language filter inside
+        a group — naming a foreign law in the query is an explicit request to
+        cross the language boundary.
+        """
+        per_group: list[list[Chunk]] = []
+        for group in source_groups:
+            candidates = self.retriever.hybrid(
+                query, source_ids=group, cross_lingual=True, query_vector=query_vector
+            )
+            per_group.append(self.reranker.rerank(query, candidates))
+        merged: list[Chunk] = []
+        seen: set[str] = set()
+        for rank in range(max(len(g) for g in per_group)):
+            for group in per_group:
+                if rank < len(group) and group[rank].chunk_id not in seen:
+                    seen.add(group[rank].chunk_id)
+                    merged.append(group[rank])
+        return merged[: self.reranker.final_k]
 
     def _rerank_within_range(
         self,

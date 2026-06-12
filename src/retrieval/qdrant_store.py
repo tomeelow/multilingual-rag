@@ -14,6 +14,7 @@ from qdrant_client.models import (
     Distance,
     FieldCondition,
     Filter,
+    MatchAny,
     MatchValue,
     PointStruct,
     VectorParams,
@@ -66,13 +67,15 @@ def search(
     query_vector: list[float],
     top_k: int,
     language: str | None = None,
+    source_ids: list[str] | None = None,
 ) -> list[tuple[str, float]]:
     """Dense search over child chunks -> [(chunk_id, score)]."""
-    query_filter = None
+    conditions = []
     if language:
-        query_filter = Filter(
-            must=[FieldCondition(key="language", match=MatchValue(value=language))]
-        )
+        conditions.append(FieldCondition(key="language", match=MatchValue(value=language)))
+    if source_ids:
+        conditions.append(FieldCondition(key="source_id", match=MatchAny(any=source_ids)))
+    query_filter = Filter(must=conditions) if conditions else None
     hits = client.query_points(
         collection_name=collection_name(),
         query=query_vector,

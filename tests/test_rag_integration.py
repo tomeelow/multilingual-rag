@@ -103,6 +103,23 @@ def test_article_range_query_filters_out_of_range(pipeline):
     assert all(c.source_id == "pl_labour_code" for c in children)
 
 
+def test_comparative_query_returns_both_sides(pipeline):
+    """Regression: 'difference between consent under GDPR and Ukrainian law'
+    used to return chunks from a single side only — a comparison cannot be
+    answered from one document."""
+    children, _, _, _ = pipeline.retrieve(
+        "What is the difference between consent for data processing under GDPR and Ukrainian law?",
+        language="en",
+        cross_lingual=True,
+    )
+    sources = {c.source_id for c in children}
+    assert sources & {"gdpr_en", "gdpr_pl"}
+    assert "ua_data_protection_law" in sources
+    # dedup: each legal unit appears at most once
+    units = [(c.source_id, c.kind, c.article_number) for c in children]
+    assert len(units) == len(set(units))
+
+
 def test_stream_answer_events(pipeline):
     events = list(pipeline.stream_answer("What are the lawful bases for processing?"))
     tokens = [e["token"] for e in events if "token" in e]

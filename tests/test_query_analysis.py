@@ -3,6 +3,8 @@
 from src.models import Chunk
 from src.pipeline.query_analysis import (
     article_base_number,
+    comparative_source_groups,
+    detect_comparative_intent,
     detect_rights_duties_intent,
     in_article_range,
     intent_weight,
@@ -112,3 +114,26 @@ def test_in_article_range_checks_kind_and_base():
     assert not in_article_range(_chunk(article_number="100"), 10, 18)
     # recital 14 is not article 14
     assert not in_article_range(_chunk(kind="recital", article_number="14"), 10, 18)
+
+
+def test_comparative_intent_three_languages():
+    assert detect_comparative_intent("What is the difference between consent under X and Y?")
+    assert detect_comparative_intent("GDPR vs Ukrainian law")
+    assert detect_comparative_intent("Czym różni się zgoda w RODO i prawie ukraińskim?")
+    assert detect_comparative_intent("Porównaj RODO z ustawą ukraińską")
+    assert detect_comparative_intent("Яка різниця між згодою за GDPR та українським законом?")
+    assert not detect_comparative_intent("What are the lawful bases for processing?")
+
+
+def test_comparative_source_groups_in_mention_order():
+    groups = comparative_source_groups(
+        "What is the difference between consent for data processing under GDPR and Ukrainian law?"
+    )
+    assert groups == [["gdpr_en", "gdpr_pl"], ["ua_data_protection_law"]]
+
+
+def test_comparative_source_groups_need_intent_and_two_documents():
+    # two documents named but no comparative phrasing
+    assert comparative_source_groups("Consent under GDPR and Ukrainian law") == []
+    # comparative phrasing but only one document named
+    assert comparative_source_groups("How does consent differ across the GDPR?") == []
