@@ -50,6 +50,12 @@ def main() -> None:
         from src.retrieval.build_indexes import build
 
         build()
+
+    from src.retrieval import qdrant_store
+
+    # close explicitly: the embedded client's __del__ during interpreter
+    # shutdown prints a scary (but harmless) ImportError traceback otherwise
+    qdrant_store.get_client().close()
     logger.info("bootstrap complete")
 
 
