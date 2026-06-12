@@ -55,7 +55,13 @@ def create_app(pipeline=None) -> FastAPI:
             app.state.pipeline = get_pipeline()
             logger.info("pipeline warmed: retriever, reranker, llm ready")
         app.state.sources = _load_sources()
-        yield
+        try:
+            yield
+        finally:
+            if pipeline is None:
+                from src.retrieval.qdrant_store import get_client
+
+                get_client().close()
 
     app = FastAPI(title="multilingual-rag", lifespan=lifespan)
 
