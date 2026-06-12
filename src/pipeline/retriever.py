@@ -12,6 +12,7 @@ from functools import lru_cache
 from src.config import pipeline_config
 from src.ingestion.chunker import load_chunks
 from src.models import Chunk
+from src.pipeline.query_analysis import article_base_number
 from src.retrieval import qdrant_store
 from src.retrieval.bm25_index import BM25Index
 from src.retrieval.embedding import get_embedder
@@ -38,23 +39,43 @@ class Retriever:
         self._qdrant = qdrant_store.get_client()
 
     def dense(
-        self, query: str, k: int | None = None, language: str | None = None
+        self,
+        query: str,
+        k: int | None = None,
+        language: str | None = None,
+        source_ids: list[str] | None = None,
     ) -> list[tuple[str, float]]:
         vector = get_embedder().embed_query(query)
-        return self.dense_by_vector(vector, k, language)
+        return self.dense_by_vector(vector, k, language, source_ids)
 
     def dense_by_vector(
-        self, vector: list[float], k: int | None = None, language: str | None = None
+        self,
+        vector: list[float],
+        k: int | None = None,
+        language: str | None = None,
+        source_ids: list[str] | None = None,
     ) -> list[tuple[str, float]]:
-        return qdrant_store.search(self._qdrant, vector, k or self.candidates_k, language)
+        return qdrant_store.search(
+            self._qdrant, vector, k or self.candidates_k, language, source_ids
+        )
 
     def bm25(
-        self, query: str, k: int | None = None, language: str | None = None
+        self,
+        query: str,
+        k: int | None = None,
+        language: str | None = None,
+        source_ids: list[str] | None = None,
     ) -> list[tuple[str, float]]:
-        results = self._bm25.search(query, (k or self.candidates_k) * (3 if language else 1))
+        k = k or self.candidates_k
+        # post-filtering needs headroom: a small document (the UA law is 4%
+        # of the corpus) may sit far down the unfiltered ranking
+        multiplier = 10 if source_ids else (3 if language else 1)
+        results = self._bm25.search(query, k * multiplier)
         if language:
             results = [r for r in results if self._children[r[0]].language == language]
-        return results[: k or self.candidates_k]
+        if source_ids:
+            results = [r for r in results if self._children[r[0]].source_id in source_ids]
+        return results[:k]
 
     def hybrid(
         self,
@@ -63,17 +84,52 @@ class Retriever:
         language: str | None = None,
         cross_lingual: bool = False,
         query_vector: list[float] | None = None,
+        source_ids: list[str] | None = None,
     ) -> list[Chunk]:
         """Top-k child chunks by RRF over both legs."""
         k = k or self.candidates_k
         lang_filter = None if cross_lingual else language
         if query_vector is None:
-            dense = self.dense(query, k, lang_filter)
+            dense = self.dense(query, k, lang_filter, source_ids)
         else:
-            dense = self.dense_by_vector(query_vector, k, lang_filter)
-        sparse = self.bm25(query, k, lang_filter)
+            dense = self.dense_by_vector(query_vector, k, lang_filter, source_ids)
+        sparse = self.bm25(query, k, lang_filter, source_ids)
         fused = rrf_fuse([dense, sparse], self.rrf_k)
         return [self._children[cid] for cid, _ in fused[:k]]
+
+    def children_in_range(
+        self,
+        lo: int,
+        hi: int,
+        language: str | None = None,
+        prefer_sources: list[str] | None = None,
+        limit: int = 40,
+    ) -> list[Chunk]:
+        """All child article chunks with base number in [lo, hi], straight
+        from metadata — articles the semantic legs missed must still enter
+        the rerank pool when the query names an explicit range.
+
+        `prefer_sources` orders the result (documents the query already
+        retrieves first), so the `limit` cut drops the least likely
+        documents, not arbitrary ones.
+        """
+        matches = [
+            c
+            for c in self._children.values()
+            if c.kind == "article"
+            and (base := article_base_number(c.article_number)) is not None
+            and lo <= base <= hi
+            and (language is None or c.language == language)
+        ]
+        rank = {s: i for i, s in enumerate(prefer_sources or [])}
+        matches.sort(
+            key=lambda c: (
+                rank.get(c.source_id, len(rank)),
+                article_base_number(c.article_number),
+                c.chunk_id,
+            )
+        )
+        return matches[:limit]
 
     def parents_of(self, children: list[Chunk]) -> list[Chunk]:
         """Parent context chunks, deduplicated, in child-ranking order."""

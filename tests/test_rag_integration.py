@@ -87,6 +87,39 @@ def test_rights_query_not_topped_by_duties_article(pipeline):
     assert "Podstawowe zasady" in (children[0].section_title or "")
 
 
+def test_article_range_query_filters_out_of_range(pipeline):
+    """Regression: 'art. 10–18 Kodeksu pracy' used to surface Art. 100 and
+    Art. 210 while Arts. 11¹–11³, 15, 17 never reached the candidate pool."""
+    children, _, _, _ = pipeline.retrieve(
+        "Jakie prawa pracownika wynikają z art. 10–18 Kodeksu pracy?",
+        language="pl",
+        cross_lingual=False,
+    )
+    from src.pipeline.query_analysis import article_base_number
+
+    bases = [article_base_number(c.article_number) for c in children]
+    assert children and all(c.kind == "article" for c in children)
+    assert all(b is not None and 10 <= b <= 18 for b in bases)
+    assert all(c.source_id == "pl_labour_code" for c in children)
+
+
+def test_comparative_query_returns_both_sides(pipeline):
+    """Regression: 'difference between consent under GDPR and Ukrainian law'
+    used to return chunks from a single side only — a comparison cannot be
+    answered from one document."""
+    children, _, _, _ = pipeline.retrieve(
+        "What is the difference between consent for data processing under GDPR and Ukrainian law?",
+        language="en",
+        cross_lingual=True,
+    )
+    sources = {c.source_id for c in children}
+    assert sources & {"gdpr_en", "gdpr_pl"}
+    assert "ua_data_protection_law" in sources
+    # dedup: each legal unit appears at most once
+    units = [(c.source_id, c.kind, c.article_number) for c in children]
+    assert len(units) == len(set(units))
+
+
 def test_stream_answer_events(pipeline):
     events = list(pipeline.stream_answer("What are the lawful bases for processing?"))
     tokens = [e["token"] for e in events if "token" in e]
