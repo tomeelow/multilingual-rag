@@ -72,6 +72,21 @@ def test_cross_lingual_answer_language_follows_query(pipeline):
     assert any(s.ref == "Article 5" for s in r.sources)
 
 
+def test_rights_query_not_topped_by_duties_article(pipeline):
+    """Regression: 'podstawowe prawa pracownika' used to rank Art. 100 KP
+    (employee *duties*, 'Pracownik jest obowiązany…') first, above the
+    Chapter II basic-principles articles that actually answer it."""
+    children, _, _, _ = pipeline.retrieve(
+        "Jakie są podstawowe prawa pracownika według Kodeksu pracy?",
+        language="pl",
+        cross_lingual=False,
+    )
+    top = [(c.source_id, c.article_number) for c in children]
+    assert ("pl_labour_code", "100") not in top
+    # the top result comes from the basic-principles chapter
+    assert "Podstawowe zasady" in (children[0].section_title or "")
+
+
 def test_stream_answer_events(pipeline):
     events = list(pipeline.stream_answer("What are the lawful bases for processing?"))
     tokens = [e["token"] for e in events if "token" in e]
