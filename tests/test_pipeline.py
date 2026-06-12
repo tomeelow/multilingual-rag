@@ -4,6 +4,7 @@ from src.models import Chunk
 from src.pipeline.cache import LLMCache, request_key
 from src.pipeline.llm import LLMClient, LLMResult
 from src.pipeline.prompts import SYSTEM_PROMPT, build_prompt
+from src.pipeline.rag_chain import _retrieval_only_text
 from src.pipeline.retriever import rrf_fuse
 
 
@@ -116,3 +117,11 @@ def test_build_prompt_format():
     assert "[Ustawa testowa | Art. 1 | lang:pl]" in user
     assert "UNOFFICIAL TRANSLATION" in user  # unofficial sources are labeled
     assert user.endswith("Question: Jakie są zasady?")
+
+
+def test_retrieval_only_text_is_explicit_and_cited():
+    text = _retrieval_only_text("pl", [_chunk()])
+    assert "Tryb tylko wyszukiwania" in text
+    assert "Nie jest to wygenerowana odpowiedź" in text
+    assert "Ustawa testowa — Art. 1" in text
+    assert "Treść artykułu." in text

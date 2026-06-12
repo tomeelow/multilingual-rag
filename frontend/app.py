@@ -69,11 +69,18 @@ if not health:
     )
     st.stop()
 
+generation_available = health.get("generation_available", False)
+
 with st.sidebar:
     st.caption(
         f"{health['indexed_chunks']} chunks · languages: {', '.join(health['languages'])} · "
         f"`{health['embedding_model']}`"
     )
+    if not generation_available:
+        st.warning(
+            "No LLM key configured. Queries use retrieval-only mode: relevant source "
+            "excerpts and citations are shown without a generated answer or translation."
+        )
     lang_choice = st.selectbox(
         "Query language",
         ["auto-detect", "en", "pl", "uk"],
@@ -88,8 +95,9 @@ with st.sidebar:
     use_hyde = st.toggle(
         "HyDE retrieval",
         value=False,
+        disabled=not generation_available,
         help="Hypothetical Document Embeddings: an LLM-written hypothetical excerpt "
-        "drives dense retrieval. Costs one extra LLM call.",
+        "drives dense retrieval. Requires an LLM key and costs one extra LLM call.",
     )
 
     st.divider()
@@ -158,6 +166,7 @@ if query:
             with st.expander("Sources", expanded=True):
                 render_sources(sources)
         st.caption(
+            f"{'retrieval-only · ' if final.get('retrieval_only') else ''}"
             f"lang: {final.get('language')} · retrieval {final.get('retrieval_ms')} ms · "
             f"rerank {final.get('rerank_ms')} ms · generation {final.get('generation_ms')} ms · "
             f"total {final.get('latency_ms')} ms"

@@ -17,7 +17,8 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from src.api.schemas import ChatRequest, Health, SourceDocument
-from src.config import DATA_PROCESSED, INDEX_DIR
+from src.config import DATA_PROCESSED, INDEX_DIR, env
+from src.pipeline.llm import credentials_available
 
 
 def _load_sources() -> list[SourceDocument]:
@@ -49,10 +50,12 @@ def create_app(pipeline=None) -> FastAPI:
     async def lifespan(app: FastAPI):
         if pipeline is not None:
             app.state.pipeline = pipeline
+            app.state.generation_available = True
         else:  # warm everything at startup, not on the first request
             from src.pipeline.rag_chain import get_pipeline
 
             app.state.pipeline = get_pipeline()
+            app.state.generation_available = credentials_available()
             logger.info("pipeline warmed: retriever, reranker, llm ready")
         app.state.sources = _load_sources()
         try:
@@ -73,12 +76,14 @@ def create_app(pipeline=None) -> FastAPI:
             t0 = time.perf_counter()
             final: dict = {}
             try:
-                for event in request.app.state.pipeline.stream_answer(
-                    body.query,
-                    filter_language=body.filter_language,
-                    cross_lingual=body.cross_lingual,
-                    use_hyde=body.use_hyde,
-                ):
+                kwargs = {
+                    "filter_language": body.filter_language,
+                    "cross_lingual": body.cross_lingual,
+                    "use_hyde": body.use_hyde and request.app.state.generation_available,
+                }
+                if not request.app.state.generation_available:
+                    kwargs["retrieval_only"] = True
+                for event in request.app.state.pipeline.stream_answer(body.query, **kwargs):
                     if event.get("done"):
                         final = event
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -113,7 +118,7 @@ def create_app(pipeline=None) -> FastAPI:
         return request.app.state.sources
 
     @app.get("/api/health")
-    async def health() -> Health:
+    async def health(request: Request) -> Health:
         meta = json.loads((INDEX_DIR / "index_meta.json").read_text())
         return Health(
             status="ok",
@@ -121,6 +126,8 @@ def create_app(pipeline=None) -> FastAPI:
             languages=sorted(meta["per_language"]),
             collection=meta["collection"],
             embedding_model=meta["embedding_model"],
+            generation_available=request.app.state.generation_available,
+            generation_provider=env("LLM_PROVIDER", "openai"),
         )
 
     return app

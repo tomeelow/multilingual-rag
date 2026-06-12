@@ -128,6 +128,11 @@ uv run streamlit run frontend/app.py           # terminal 2
 uv run pytest                                  # 46 tests
 ```
 
+Without an OpenAI or Anthropic API key, the app automatically runs in
+**retrieval-only mode**: queries still execute language detection, hybrid
+retrieval, and reranking, then show the most relevant source excerpts and
+citations. Generated answers, translation, and HyDE require an LLM key.
+
 ## Example queries
 
 Try these in the UI (also wired as one-click examples):

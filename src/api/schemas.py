@@ -30,3 +30,5 @@ class Health(BaseModel):
     languages: list[str]
     collection: str
     embedding_model: str
+    generation_available: bool
+    generation_provider: str

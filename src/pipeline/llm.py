@@ -15,6 +15,15 @@ from src.config import env
 from src.pipeline.cache import LLMCache, request_key
 
 
+def credentials_available(provider: str | None = None) -> bool:
+    provider = provider or env("LLM_PROVIDER", "openai")
+    if provider == "openai":
+        return bool(env("OPENAI_API_KEY") or env("OPENAI_ADMIN_KEY"))
+    if provider == "anthropic":
+        return bool(env("ANTHROPIC_API_KEY"))
+    return False
+
+
 @dataclass
 class LLMResult:
     text: str

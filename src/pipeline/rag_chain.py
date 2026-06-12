@@ -44,6 +44,34 @@ class RAGResponse(BaseModel):
     cached: bool
     input_tokens: int
     output_tokens: int
+    retrieval_only: bool = False
+
+
+_RETRIEVAL_ONLY_NOTICE = {
+    "en": (
+        "Retrieval-only mode: no external LLM is configured. Below are the most relevant "
+        "source excerpts. This is not a generated legal answer or translation."
+    ),
+    "pl": (
+        "Tryb tylko wyszukiwania: nie skonfigurowano zewnętrznego modelu LLM. Poniżej "
+        "znajdują się najtrafniejsze fragmenty źródeł. Nie jest to wygenerowana odpowiedź "
+        "prawna ani tłumaczenie."
+    ),
+    "uk": (
+        "Режим лише пошуку: зовнішню модель LLM не налаштовано. Нижче наведено "
+        "найрелевантніші уривки з джерел. Це не згенерована юридична відповідь і не переклад."
+    ),
+}
+
+
+def _retrieval_only_text(language: str, parents: list[Chunk]) -> str:
+    blocks = [_RETRIEVAL_ONLY_NOTICE.get(language, _RETRIEVAL_ONLY_NOTICE["en"])]
+    for chunk in parents[:3]:
+        excerpt = chunk.text.strip()
+        if len(excerpt) > 1200:
+            excerpt = excerpt[:1200].rsplit(" ", 1)[0] + "…"
+        blocks.append(f"### {chunk.doc_title} — {chunk.ref or chunk.kind}\n\n{excerpt}")
+    return "\n\n".join(blocks)
 
 
 def _sources(parents: list[Chunk]) -> list[Source]:
@@ -99,6 +127,7 @@ class RAGPipeline:
         filter_language: str | None = None,
         cross_lingual: bool = False,
         use_hyde: bool = False,
+        retrieval_only: bool = False,
     ) -> RAGResponse:
         t0 = time.perf_counter()
         language = filter_language or detect_language(query)
@@ -106,14 +135,19 @@ class RAGPipeline:
             query, language, cross_lingual, use_hyde
         )
         t1 = time.perf_counter()
-        result = self.llm.complete(
-            build_prompt(query, parents),
-            max_tokens=self.gen_cfg["max_tokens"],
-            temperature=self.gen_cfg["temperature"],
-        )
+        if retrieval_only:
+            result = None
+            text = _retrieval_only_text(language, parents)
+        else:
+            result = self.llm.complete(
+                build_prompt(query, parents),
+                max_tokens=self.gen_cfg["max_tokens"],
+                temperature=self.gen_cfg["temperature"],
+            )
+            text = result.text
         t2 = time.perf_counter()
         return RAGResponse(
-            text=result.text,
+            text=text,
             language=language,
             sources=_sources(parents),
             chunk_ids=[c.chunk_id for c in children],
@@ -121,9 +155,10 @@ class RAGPipeline:
             retrieval_ms=retrieval_ms,
             rerank_ms=rerank_ms,
             generation_ms=int((t2 - t1) * 1000),
-            cached=result.cached,
-            input_tokens=result.input_tokens,
-            output_tokens=result.output_tokens,
+            cached=result.cached if result else False,
+            input_tokens=result.input_tokens if result else 0,
+            output_tokens=result.output_tokens if result else 0,
+            retrieval_only=retrieval_only,
         )
 
     def stream_answer(
@@ -132,6 +167,7 @@ class RAGPipeline:
         filter_language: str | None = None,
         cross_lingual: bool = False,
         use_hyde: bool = False,
+        retrieval_only: bool = False,
     ) -> Iterator[dict[str, Any]]:
         """Yields {"token": str} events, then one final {"done": True, ...}
         event with sources and latency metadata."""
@@ -141,12 +177,17 @@ class RAGPipeline:
             query, language, cross_lingual, use_hyde
         )
         t1 = time.perf_counter()
-        for token in self.llm.stream(
-            build_prompt(query, parents),
-            max_tokens=self.gen_cfg["max_tokens"],
-            temperature=self.gen_cfg["temperature"],
-        ):
-            yield {"token": token}
+        if retrieval_only:
+            text = _retrieval_only_text(language, parents)
+            for i in range(0, len(text), 48):
+                yield {"token": text[i : i + 48]}
+        else:
+            for token in self.llm.stream(
+                build_prompt(query, parents),
+                max_tokens=self.gen_cfg["max_tokens"],
+                temperature=self.gen_cfg["temperature"],
+            ):
+                yield {"token": token}
         t2 = time.perf_counter()
         yield {
             "done": True,
@@ -157,6 +198,7 @@ class RAGPipeline:
             "retrieval_ms": retrieval_ms,
             "rerank_ms": rerank_ms,
             "generation_ms": int((t2 - t1) * 1000),
+            "retrieval_only": retrieval_only,
         }
 
 

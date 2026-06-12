@@ -94,3 +94,5 @@ def test_health(client):
     assert h["indexed_chunks"] == 3710
     assert h["languages"] == ["en", "pl", "uk"]
     assert h["embedding_model"] == "intfloat/multilingual-e5-large"
+    assert h["generation_available"] is True
+    assert h["generation_provider"] == "openai"
