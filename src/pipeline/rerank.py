@@ -43,7 +43,21 @@ class Reranker:
             for c, s in zip(chunks, raw, strict=True)
         ]
         ranked = sorted(zip(chunks, scores, strict=True), key=lambda x: x[1], reverse=True)
-        return [c for c, _ in ranked[: top_k or self.final_k]]
+        return _dedup([c for c, _ in ranked])[: top_k or self.final_k]
+
+
+def _dedup(chunks: list[Chunk]) -> list[Chunk]:
+    """One result slot per legal unit: two child chunks of GDPR Article 6
+    say less than Article 6 plus Article 7. Keyed by (source, kind, number)
+    — recital 6 and article 6 of the same document are distinct units."""
+    seen: set[tuple] = set()
+    out: list[Chunk] = []
+    for c in chunks:
+        key = (c.source_id, c.kind, c.article_number or c.parent_id)
+        if key not in seen:
+            seen.add(key)
+            out.append(c)
+    return out
 
 
 @lru_cache(maxsize=1)
