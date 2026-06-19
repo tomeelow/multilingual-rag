@@ -2,7 +2,12 @@
 
 from src.models import Chunk
 from src.pipeline.cache import LLMCache, request_key
-from src.pipeline.llm import LLMClient, LLMResult
+from src.pipeline.llm import (
+    LLMClient,
+    LLMResult,
+    _gemini_payload,
+    credentials_available,
+)
 from src.pipeline.prompts import SYSTEM_PROMPT, build_prompt
 from src.pipeline.rag_chain import _retrieval_only_text
 from src.pipeline.retriever import rrf_fuse
@@ -80,6 +85,33 @@ def test_llm_stream_fills_and_replays_cache(tmp_path):
     assert llm.raw_calls == 1
     # the streamed response is also visible to complete()
     assert llm.complete(messages).cached
+
+
+def test_gemini_provider_defaults(tmp_path):
+    llm = LLMClient(provider="gemini", cache=LLMCache(tmp_path / "c.sqlite3"))
+    assert llm.model == "gemini-2.5-flash"
+
+
+def test_gemini_credentials_follow_env(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert not credentials_available("gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    assert credentials_available("gemini")
+
+
+def test_gemini_payload_splits_system_and_maps_roles():
+    system, contents = _gemini_payload(
+        [
+            {"role": "system", "content": "rules"},
+            {"role": "user", "content": "q"},
+            {"role": "assistant", "content": "a"},
+        ]
+    )
+    assert system == "rules"
+    assert contents == [
+        {"role": "user", "parts": [{"text": "q"}]},
+        {"role": "model", "parts": [{"text": "a"}]},  # assistant -> Gemini's "model"
+    ]
 
 
 def _chunk(**kw) -> Chunk:
