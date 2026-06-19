@@ -5,6 +5,7 @@ from src.pipeline.cache import LLMCache, request_key
 from src.pipeline.llm import (
     LLMClient,
     LLMResult,
+    _gemini_config,
     _gemini_payload,
     credentials_available,
 )
@@ -97,6 +98,15 @@ def test_gemini_credentials_follow_env(monkeypatch):
     assert not credentials_available("gemini")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     assert credentials_available("gemini")
+
+
+def test_gemini_config_disables_thinking():
+    # thinking_budget=0 keeps the 2.5 models from spending the answer's token
+    # budget on a hidden reasoning pass (which truncates the visible answer).
+    cfg = _gemini_config("rules", 1024, 0.0)
+    assert cfg["thinking_config"] == {"thinking_budget": 0}
+    assert cfg["max_output_tokens"] == 1024
+    assert cfg["system_instruction"] == "rules"
 
 
 def test_gemini_payload_splits_system_and_maps_roles():
