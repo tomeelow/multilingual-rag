@@ -41,6 +41,25 @@ def _gemini_payload(messages: list[dict]) -> tuple[str | None, list[dict]]:
     return system or None, contents
 
 
+def _gemini_config(system: str | None, max_tokens: int, temperature: float) -> dict:
+    """Generation config for Gemini.
+
+    thinking_budget=0 disables the 2.5 models' reasoning pass. Left on, it
+    spends the shared max_output_tokens budget on hidden thoughts (~980 of
+    1024 in practice) and truncates the visible answer mid-sentence with
+    finish_reason=MAX_TOKENS. This pipeline does grounded, citation-based
+    extraction at temperature 0, so the thinking pass adds latency and cost
+    without improving answers — and max_tokens then means answer tokens, the
+    same as it does for the OpenAI and Anthropic providers.
+    """
+    return {
+        "system_instruction": system,
+        "max_output_tokens": max_tokens,
+        "temperature": temperature,
+        "thinking_config": {"thinking_budget": 0},
+    }
+
+
 @dataclass
 class LLMResult:
     text: str
@@ -147,11 +166,7 @@ class LLMClient:
             r = self.client.models.generate_content(
                 model=self.model,
                 contents=contents,
-                config={
-                    "system_instruction": system,
-                    "max_output_tokens": max_tokens,
-                    "temperature": temperature,
-                },
+                config=_gemini_config(system, max_tokens, temperature),
             )
             usage = r.usage_metadata
             return LLMResult(
@@ -201,11 +216,7 @@ class LLMClient:
             for chunk in self.client.models.generate_content_stream(
                 model=self.model,
                 contents=contents,
-                config={
-                    "system_instruction": system,
-                    "max_output_tokens": max_tokens,
-                    "temperature": temperature,
-                },
+                config=_gemini_config(system, max_tokens, temperature),
             ):
                 if chunk.usage_metadata:
                     usage["input_tokens"] = chunk.usage_metadata.prompt_token_count or 0
