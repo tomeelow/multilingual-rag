@@ -1,4 +1,4 @@
-"""LLM client: OpenAI (default) or Anthropic, selected by LLM_PROVIDER.
+"""LLM client: OpenAI (default), Anthropic, or Gemini, selected by LLM_PROVIDER.
 
 Models are pinned via env (.env.example), never "latest". All calls are
 cache-first (src/pipeline/cache.py); streaming replays cached text on a hit
@@ -21,7 +21,24 @@ def credentials_available(provider: str | None = None) -> bool:
         return bool(env("OPENAI_API_KEY") or env("OPENAI_ADMIN_KEY"))
     if provider == "anthropic":
         return bool(env("ANTHROPIC_API_KEY"))
+    if provider == "gemini":
+        return bool(env("GEMINI_API_KEY"))
     return False
+
+
+def _gemini_payload(messages: list[dict]) -> tuple[str | None, list[dict]]:
+    """Split OpenAI-style messages into (system_instruction, contents) for Gemini.
+
+    System turns collapse into a single instruction; the assistant role is
+    renamed to Gemini's "model".
+    """
+    system = "\n".join(m["content"] for m in messages if m["role"] == "system")
+    contents = [
+        {"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
+        for m in messages
+        if m["role"] != "system"
+    ]
+    return system or None, contents
 
 
 @dataclass
@@ -45,6 +62,8 @@ class LLMClient:
             self.model = model or env("OPENAI_MODEL", "gpt-4o-mini-2024-07-18")
         elif self.provider == "anthropic":
             self.model = model or env("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        elif self.provider == "gemini":
+            self.model = model or env("GEMINI_MODEL", "gemini-2.5-flash")
         else:
             raise ValueError(f"unknown LLM_PROVIDER: {self.provider}")
         self.cache = cache or LLMCache()
@@ -57,6 +76,10 @@ class LLMClient:
                 from openai import OpenAI
 
                 self._client = OpenAI()
+            elif self.provider == "gemini":
+                from google import genai
+
+                self._client = genai.Client(api_key=env("GEMINI_API_KEY"))
             else:
                 from anthropic import Anthropic
 
@@ -119,6 +142,24 @@ class LLMClient:
                 output_tokens=r.usage.completion_tokens,
                 model=self.model,
             )
+        if self.provider == "gemini":
+            system, contents = _gemini_payload(messages)
+            r = self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config={
+                    "system_instruction": system,
+                    "max_output_tokens": max_tokens,
+                    "temperature": temperature,
+                },
+            )
+            usage = r.usage_metadata
+            return LLMResult(
+                text=r.text or "",
+                input_tokens=usage.prompt_token_count or 0,
+                output_tokens=usage.candidates_token_count or 0,
+                model=self.model,
+            )
         system = "\n".join(m["content"] for m in messages if m["role"] == "system")
         rest = [m for m in messages if m["role"] != "system"]
         r = self.client.messages.create(
@@ -154,6 +195,23 @@ class LLMClient:
                     usage["output_tokens"] = event.usage.completion_tokens
                 if event.choices and event.choices[0].delta.content:
                     yield event.choices[0].delta.content
+            return
+        if self.provider == "gemini":
+            system, contents = _gemini_payload(messages)
+            for chunk in self.client.models.generate_content_stream(
+                model=self.model,
+                contents=contents,
+                config={
+                    "system_instruction": system,
+                    "max_output_tokens": max_tokens,
+                    "temperature": temperature,
+                },
+            ):
+                if chunk.usage_metadata:
+                    usage["input_tokens"] = chunk.usage_metadata.prompt_token_count or 0
+                    usage["output_tokens"] = chunk.usage_metadata.candidates_token_count or 0
+                if chunk.text:
+                    yield chunk.text
             return
         system = "\n".join(m["content"] for m in messages if m["role"] == "system")
         rest = [m for m in messages if m["role"] != "system"]

@@ -19,6 +19,7 @@ dependencies = [
     # generation
     "openai>=1.55",
     "anthropic>=0.40",
+    "google-genai>=1.0",
     # api
     "fastapi>=0.115",
     "uvicorn>=0.32",
