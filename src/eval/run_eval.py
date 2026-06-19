@@ -25,22 +25,25 @@ from datetime import date
 from typing import Any
 
 import yaml
+from langchain_core.embeddings import Embeddings
 from loguru import logger
 
 from src.config import ROOT, env, pipeline_config
 from src.eval.metrics import RetrievalScores, mean, percentile, score_retrieval
 from src.models import Chunk
 from src.pipeline.hyde import hyde_query_vector
-from src.pipeline.llm import get_llm
+from src.pipeline.llm import credentials_available, get_llm
 from src.pipeline.prompts import build_prompt
 from src.pipeline.rerank import get_reranker
 from src.pipeline.retriever import get_retriever
+from src.retrieval.embedding import get_embedder
 
 GOLDEN_SET = ROOT / "src" / "eval" / "golden_set.yaml"
 RESULTS_DIR = ROOT / "docs" / "eval"
 
-# pinned pricing for cost tracking (USD per 1M tokens, gpt-4o-mini)
-PRICE_IN, PRICE_OUT = 0.15, 0.60
+# pinned pricing for cost tracking (USD per 1M tokens, gemini-2.5-flash public
+# rates). Tracks answer generation only; the ragas judge calls are not counted.
+PRICE_IN, PRICE_OUT = 0.30, 2.50
 
 CONFIGS = ["dense", "hybrid", "hybrid_rerank", "hybrid_rerank_hyde"]
 
@@ -124,10 +127,23 @@ def run_config(config: str, items: list[dict]) -> dict[str, Any]:
     }
 
 
+class _E5Embeddings(Embeddings):
+    """LangChain Embeddings backed by the project's local multilingual-e5 model,
+    so ragas needs no embedding API: documents get the 'passage:' prefix and
+    queries the 'query:' prefix, matching how the index was built."""
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [v.tolist() for v in get_embedder().embed_passages(texts)]
+
+    def embed_query(self, text: str) -> list[float]:
+        return get_embedder().embed_query(text)
+
+
 def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
-    """LLM-judged generation metrics + cost tracking. Requires an API key."""
+    """LLM-judged generation metrics + cost tracking. Judge is the configured
+    Gemini model; embeddings are the local e5 model (no embedding API)."""
     from datasets import Dataset
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+    from langchain_google_genai import ChatGoogleGenerativeAI
     from ragas import evaluate
     from ragas.metrics import (
         answer_relevancy,
@@ -135,6 +151,7 @@ def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
         context_recall,
         faithfulness,
     )
+    from ragas.run_config import RunConfig
 
     llm = get_llm()
     gen_cfg = pipeline_config()["generation"]
@@ -161,8 +178,15 @@ def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
     scores = evaluate(
         Dataset.from_list(rows),
         metrics=[context_precision, context_recall, faithfulness, answer_relevancy],
-        llm=ChatOpenAI(model=env("OPENAI_MODEL", "gpt-4o-mini-2024-07-18")),
-        embeddings=OpenAIEmbeddings(model="text-embedding-3-small"),
+        llm=ChatGoogleGenerativeAI(
+            model=env("GEMINI_MODEL", "gemini-2.5-flash"),
+            google_api_key=env("GEMINI_API_KEY"),
+            temperature=0.0,
+        ),
+        embeddings=_E5Embeddings(),
+        # bounded concurrency + generous timeout: a judge behind provider rate
+        # limits 429-storms and times out at the default 16 workers / 180 s
+        run_config=RunConfig(max_workers=4, timeout=300),
     )
     cost = (in_tok * PRICE_IN + out_tok * PRICE_OUT) / 1e6
     logger.info(
@@ -238,7 +262,7 @@ def write_markdown(reports: list[dict], ragas_scores: dict[str, dict]) -> str:
             )
     else:
         lines += [
-            "_Not run: requires an LLM API key (`OPENAI_API_KEY` in `.env`). "
+            "_Not run: requires a key for the configured `LLM_PROVIDER` in `.env`. "
             "Run `uv run python -m src.eval.run_eval --ragas` to fill this table._",
         ]
     return "\n".join(lines) + "\n"
@@ -248,16 +272,26 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+", default=None, choices=CONFIGS)
     parser.add_argument("--ragas", action="store_true", help="run LLM-judged metrics")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="evaluate only the first N golden-set items; outputs go to *.proof.* "
+        "files so a partial run never overwrites the full-corpus results",
+    )
     args = parser.parse_args()
 
-    has_key = bool(env("OPENAI_API_KEY") or env("ANTHROPIC_API_KEY"))
+    has_key = credentials_available()  # active LLM_PROVIDER's key (gemini here)
     configs = args.configs or (CONFIGS if has_key else CONFIGS[:3])
     if "hybrid_rerank_hyde" in configs and not has_key:
         logger.warning("skipping hybrid_rerank_hyde: HyDE needs an LLM key")
         configs = [c for c in configs if c != "hybrid_rerank_hyde"]
 
     items = load_golden_set()
-    logger.info("golden set: {} items", len(items))
+    if args.limit:
+        items = items[: args.limit]
+    suffix = ".proof" if args.limit else ""
+    logger.info("golden set: {} items{}", len(items), " (proof subset)" if args.limit else "")
 
     reports, ragas_scores = [], {}
     for config in configs:
@@ -271,10 +305,10 @@ def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     for r in reports:
         slim = {k: v for k, v in r.items() if k != "_results"}
-        (RESULTS_DIR / f"{r['config']}.json").write_text(json.dumps(slim, indent=2))
+        (RESULTS_DIR / f"{r['config']}{suffix}.json").write_text(json.dumps(slim, indent=2))
     md = write_markdown(reports, ragas_scores)
-    (RESULTS_DIR / "results.md").write_text(md)
-    logger.info("wrote {}", RESULTS_DIR / "results.md")
+    (RESULTS_DIR / f"results{suffix}.md").write_text(md)
+    logger.info("wrote {}", RESULTS_DIR / f"results{suffix}.md")
 
 
 if __name__ == "__main__":
