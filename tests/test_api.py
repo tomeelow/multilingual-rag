@@ -88,11 +88,14 @@ def test_sources_lists_corpus(client):
 
 
 @pytest.mark.skipif(not (INDEX_DIR / "index_meta.json").exists(), reason="indexes not built")
-def test_health(client):
+def test_health(client, monkeypatch):
+    # pin the provider: health reports whatever LLM_PROVIDER is set to, so
+    # asserting a literal would fail on any checkout configured differently
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
     h = client.get("/api/health").json()
     assert h["status"] == "ok"
     assert h["indexed_chunks"] == 3710
     assert h["languages"] == ["en", "pl", "uk"]
     assert h["embedding_model"] == "intfloat/multilingual-e5-large"
     assert h["generation_available"] is True
-    assert h["generation_provider"] == "openai"
+    assert h["generation_provider"] == "anthropic"
