@@ -1,9 +1,13 @@
-"""Evaluation harness: metric math and golden-set integrity."""
+"""Evaluation harness: metric math, golden-set integrity, and result reporting."""
 
+import json
+
+import pytest
 import yaml
 
 from src.config import ROOT
 from src.eval.metrics import chunk_matches_unit, percentile, score_retrieval
+from src.eval.run_eval import check_all_items_scored, judge_llm, write_results
 
 
 def test_chunk_matches_unit_boundaries():
@@ -46,6 +50,66 @@ def test_percentile():
     assert percentile(values, 95) == 95.0
     assert percentile([1.0], 95) == 1.0
     assert percentile([], 95) == 0.0
+
+
+def test_check_all_items_scored_rejects_unjudged_items():
+    """A timed-out judge job leaves NaN; averaging it away would understate the
+    sample size, so the run must fail rather than publish the mean."""
+    pd = pytest.importorskip("pandas")
+
+    complete = pd.DataFrame({"faithfulness": [1.0, 0.5], "answer_relevancy": [0.9, 0.8]})
+    check_all_items_scored(complete, "hybrid_rerank")  # no raise
+
+    partial = pd.DataFrame({"faithfulness": [1.0, float("nan")], "answer_relevancy": [0.9, 0.8]})
+    with pytest.raises(RuntimeError, match="faithfulness failed on 1/2 items"):
+        check_all_items_scored(partial, "hybrid_rerank")
+
+
+def test_judge_llm_follows_provider(monkeypatch):
+    """The judge must track LLM_PROVIDER — a hardwired judge would keep hitting
+    the old provider's rate limit after switching to escape it."""
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-a-real-secret")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-4o-mini-2024-07-18")
+    assert judge_llm().model_name == "gpt-4o-mini-2024-07-18"
+
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    with pytest.raises(ValueError, match="langchain-anthropic"):
+        judge_llm()
+
+    monkeypatch.setenv("LLM_PROVIDER", "nonsense")
+    with pytest.raises(ValueError, match="unknown LLM_PROVIDER"):
+        judge_llm()
+
+
+def test_write_results_is_incremental(tmp_path, monkeypatch):
+    """Results land on disk per config, so a later failure cannot discard the
+    minutes of reranking already spent on earlier ones."""
+    monkeypatch.setattr("src.eval.run_eval.RESULTS_DIR", tmp_path)
+    report = {
+        "config": "dense",
+        "overall": {
+            "n": 2,
+            "unit_hit@5": 0.5,
+            "unit_recall@5": 0.5,
+            "mrr": 0.5,
+            "doc_recall@5": 1.0,
+        },
+        "by_difficulty": {
+            d: {"unit_hit@5": 0.5, "mrr": 0.5} for d in ("simple", "cross-lingual", "multi-hop")
+        },
+        "by_language": {lang: {"unit_hit@5": 0.5, "mrr": 0.5} for lang in ("en", "pl", "uk")},
+        "latency_ms": {"p50": 90.0, "p95": 120.0},
+        "_results": ["dropped from the json"],
+    }
+
+    write_results([report], {}, "")
+    assert json.loads((tmp_path / "dense.json").read_text())["overall"]["n"] == 2
+    assert "_results" not in json.loads((tmp_path / "dense.json").read_text())
+    assert "Not run" in (tmp_path / "results.md").read_text()  # ragas table still empty
+
+    write_results([report], {"dense": {"faithfulness": 0.9, "generation_cost_usd": 0.01}}, "")
+    assert "0.9" in (tmp_path / "results.md").read_text()
 
 
 def test_golden_set_integrity():
