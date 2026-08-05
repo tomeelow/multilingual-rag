@@ -28,7 +28,7 @@ flowchart LR
         API --> RAG[RAG pipeline]
         RAG --> Q
         RAG --> B
-        RAG --> LLM[GPT-4o-mini / Claude<br/>behind SQLite cache]
+        RAG --> LLM[GPT-4o-mini / Claude / Gemini<br/>behind SQLite cache]
     end
 ```
 
@@ -101,15 +101,27 @@ An initial evaluation exposed that the English-only `ms-marco-MiniLM`
 cross-encoder removed correct foreign-language passages from cross-lingual
 results. The production pipeline now uses the multilingual
 `BAAI/bge-reranker-v2-m3`; current measurements are recorded in
-[docs/eval/results.md](docs/eval/results.md). ragas generation metrics
-(faithfulness, answer relevancy, …) are wired in and run with
-`uv run python -m src.eval.run_eval --ragas` once an LLM key is configured.
+[docs/eval/results.md](docs/eval/results.md).
+
+The retrieval ablation above is deterministic and needs **no API key**:
+
+```bash
+uv run python -m src.eval.run_eval --configs dense hybrid hybrid_rerank
+```
+
+ragas generation metrics (context precision/recall, faithfulness, answer
+relevancy) are wired in and verified working; adding `--ragas` fills that
+table. Budget for it first — the four metrics cost **~11 judge calls per item
+per config**, roughly 2,700 requests for the full four-config table, which
+needs a paid API tier (a free-tier Gemini key is capped at 20 requests/day).
+Measured numbers in
+[docs/phases/ragas_generation_eval.md](docs/phases/ragas_generation_eval.md).
 
 ## Setup
 
 ```bash
 git clone <repo-url> && cd multilingual-rag
-cp .env.example .env   # add OPENAI_API_KEY (optional: retrieval works without)
+cp .env.example .env   # set LLM_PROVIDER + its key (optional: retrieval works without)
 docker compose up
 ```
 
@@ -123,13 +135,14 @@ uv sync
 uv run python -m src.bootstrap                 # parse + chunk + index (embedded Qdrant)
 uv run uvicorn src.api.main:app --port 8000    # terminal 1
 uv run streamlit run frontend/app.py           # terminal 2
-uv run pytest                                  # 47 tests
+uv run pytest                                  # 73 tests
 ```
 
-Without an OpenAI or Anthropic API key, the app automatically runs in
-**retrieval-only mode**: queries still execute language detection, hybrid
-retrieval, and reranking, then show the most relevant source excerpts and
-citations. Generated answers, translation, and HyDE require an LLM key.
+Without an API key for the configured `LLM_PROVIDER` (openai, anthropic, or
+gemini), the app automatically runs in **retrieval-only mode**: queries still
+execute language detection, hybrid retrieval, and reranking, then show the most
+relevant source excerpts and citations. Generated answers, translation, and
+HyDE require an LLM key.
 
 ## Example queries
 

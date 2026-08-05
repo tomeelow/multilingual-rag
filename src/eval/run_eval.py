@@ -25,22 +25,25 @@ from datetime import date
 from typing import Any
 
 import yaml
+from langchain_core.embeddings import Embeddings
 from loguru import logger
 
 from src.config import ROOT, env, pipeline_config
 from src.eval.metrics import RetrievalScores, mean, percentile, score_retrieval
 from src.models import Chunk
 from src.pipeline.hyde import hyde_query_vector
-from src.pipeline.llm import get_llm
+from src.pipeline.llm import credentials_available, get_llm
 from src.pipeline.prompts import build_prompt
 from src.pipeline.rerank import get_reranker
 from src.pipeline.retriever import get_retriever
+from src.retrieval.embedding import get_embedder
 
 GOLDEN_SET = ROOT / "src" / "eval" / "golden_set.yaml"
 RESULTS_DIR = ROOT / "docs" / "eval"
 
-# pinned pricing for cost tracking (USD per 1M tokens, gpt-4o-mini)
-PRICE_IN, PRICE_OUT = 0.15, 0.60
+# pinned pricing for cost tracking (USD per 1M tokens, gemini-2.5-flash public
+# rates). Tracks answer generation only; the ragas judge calls are not counted.
+PRICE_IN, PRICE_OUT = 0.30, 2.50
 
 CONFIGS = ["dense", "hybrid", "hybrid_rerank", "hybrid_rerank_hyde"]
 
@@ -124,10 +127,76 @@ def run_config(config: str, items: list[dict]) -> dict[str, Any]:
     }
 
 
+class _E5Embeddings(Embeddings):
+    """LangChain Embeddings backed by the project's local multilingual-e5 model,
+    so ragas needs no embedding API: documents get the 'passage:' prefix and
+    queries the 'query:' prefix, matching how the index was built."""
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [v.tolist() for v in get_embedder().embed_passages(texts)]
+
+    def embed_query(self, text: str) -> list[float]:
+        return get_embedder().embed_query(text)
+
+
+def check_all_items_scored(df: Any, config: str) -> None:
+    """Raise unless the judge scored every item on every metric.
+
+    A judge job that exhausts its retries leaves NaN for that row, and pandas
+    skips NaN when averaging — so the published mean would quietly cover fewer
+    items than the header claims. That is a hole in the results table that
+    reads exactly like a real score, so refuse to publish it.
+    """
+    means = df.mean(numeric_only=True)
+    dropped = {m: int(df[m].isna().sum()) for m in means.index if df[m].isna().any()}
+    if dropped:
+        raise RuntimeError(
+            f"ragas judge did not score every item for {config}: "
+            + ", ".join(f"{m} failed on {n}/{len(df)} items" for m, n in dropped.items())
+            + ". Refusing to publish means over a smaller sample than reported. This is "
+            "almost always the provider rate limit — see the 429s above and rerun with "
+            "more quota, or use --limit N for a smaller proof run."
+        )
+
+
+def judge_llm() -> Any:
+    """LangChain chat model for the ragas judge, following LLM_PROVIDER.
+
+    Pinned to the same provider that generated the answers: a judge hardwired
+    to one provider silently ignores LLM_PROVIDER, so switching providers to
+    escape a rate limit would still bottleneck on the old one.
+    """
+    provider = env("LLM_PROVIDER", "openai")
+    if provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=env("GEMINI_MODEL", "gemini-2.5-flash"),
+            google_api_key=env("GEMINI_API_KEY"),
+            temperature=0.0,
+        )
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(
+            model=env("OPENAI_MODEL", "gpt-4o-mini-2024-07-18"),
+            api_key=env("OPENAI_API_KEY"),
+            temperature=0.0,
+        )
+    if provider == "anthropic":
+        # langchain-anthropic is not a project dependency; add it to judge here
+        raise ValueError(
+            "LLM_PROVIDER=anthropic has no ragas judge: add `langchain-anthropic` to "
+            "pyproject.toml and wire ChatAnthropic in judge_llm(), or set LLM_PROVIDER "
+            "to openai or gemini for the eval run."
+        )
+    raise ValueError(f"unknown LLM_PROVIDER: {provider}")
+
+
 def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
-    """LLM-judged generation metrics + cost tracking. Requires an API key."""
+    """LLM-judged generation metrics + cost tracking. Judge follows LLM_PROVIDER;
+    embeddings are the local e5 model (no embedding API)."""
     from datasets import Dataset
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
     from ragas import evaluate
     from ragas.metrics import (
         answer_relevancy,
@@ -135,6 +204,7 @@ def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
         context_recall,
         faithfulness,
     )
+    from ragas.run_config import RunConfig
 
     llm = get_llm()
     gen_cfg = pipeline_config()["generation"]
@@ -161,8 +231,11 @@ def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
     scores = evaluate(
         Dataset.from_list(rows),
         metrics=[context_precision, context_recall, faithfulness, answer_relevancy],
-        llm=ChatOpenAI(model=env("OPENAI_MODEL", "gpt-4o-mini-2024-07-18")),
-        embeddings=OpenAIEmbeddings(model="text-embedding-3-small"),
+        llm=judge_llm(),
+        embeddings=_E5Embeddings(),
+        # bounded concurrency + generous timeout: a judge behind provider rate
+        # limits 429-storms and times out at the default 16 workers / 180 s
+        run_config=RunConfig(max_workers=4, timeout=300),
     )
     cost = (in_tok * PRICE_IN + out_tok * PRICE_OUT) / 1e6
     logger.info(
@@ -172,7 +245,9 @@ def run_ragas(config_report: dict, items: list[dict]) -> dict[str, float]:
         in_tok,
         out_tok,
     )
-    means = scores.to_pandas().mean(numeric_only=True)
+    df = scores.to_pandas()
+    check_all_items_scored(df, config_report["config"])
+    means = df.mean(numeric_only=True)
     return {k: round(float(v), 3) for k, v in means.items()} | {
         "generation_cost_usd": round(cost, 4)
     }
@@ -238,43 +313,59 @@ def write_markdown(reports: list[dict], ragas_scores: dict[str, dict]) -> str:
             )
     else:
         lines += [
-            "_Not run: requires an LLM API key (`OPENAI_API_KEY` in `.env`). "
+            "_Not run: requires a key for the configured `LLM_PROVIDER` in `.env`. "
             "Run `uv run python -m src.eval.run_eval --ragas` to fill this table._",
         ]
     return "\n".join(lines) + "\n"
+
+
+def write_results(reports: list[dict], ragas_scores: dict[str, dict], suffix: str) -> None:
+    for r in reports:
+        slim = {k: v for k, v in r.items() if k != "_results"}
+        (RESULTS_DIR / f"{r['config']}{suffix}.json").write_text(json.dumps(slim, indent=2))
+    (RESULTS_DIR / f"results{suffix}.md").write_text(write_markdown(reports, ragas_scores))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+", default=None, choices=CONFIGS)
     parser.add_argument("--ragas", action="store_true", help="run LLM-judged metrics")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="evaluate only the first N golden-set items; outputs go to *.proof.* "
+        "files so a partial run never overwrites the full-corpus results",
+    )
     args = parser.parse_args()
 
-    has_key = bool(env("OPENAI_API_KEY") or env("ANTHROPIC_API_KEY"))
+    has_key = credentials_available()  # active LLM_PROVIDER's key (gemini here)
     configs = args.configs or (CONFIGS if has_key else CONFIGS[:3])
     if "hybrid_rerank_hyde" in configs and not has_key:
         logger.warning("skipping hybrid_rerank_hyde: HyDE needs an LLM key")
         configs = [c for c in configs if c != "hybrid_rerank_hyde"]
 
     items = load_golden_set()
-    logger.info("golden set: {} items", len(items))
+    if args.limit:
+        items = items[: args.limit]
+    suffix = ".proof" if args.limit else ""
+    logger.info("golden set: {} items{}", len(items), " (proof subset)" if args.limit else "")
 
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     reports, ragas_scores = [], {}
     for config in configs:
         logger.info("running config: {}", config)
         report = run_config(config, items)
         logger.info("  {} | latency {}", report["overall"], report["latency_ms"])
         reports.append(report)
+        # flush after each stage: a judge that dies on config 3 of 4 (an exhausted
+        # rate limit, most likely) then costs only its own scores, not the whole
+        # run's retrieval work — minutes of reranking per config
+        write_results(reports, ragas_scores, suffix)
         if args.ragas and has_key:
             ragas_scores[config] = run_ragas(report, items)
-
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    for r in reports:
-        slim = {k: v for k, v in r.items() if k != "_results"}
-        (RESULTS_DIR / f"{r['config']}.json").write_text(json.dumps(slim, indent=2))
-    md = write_markdown(reports, ragas_scores)
-    (RESULTS_DIR / "results.md").write_text(md)
-    logger.info("wrote {}", RESULTS_DIR / "results.md")
+            write_results(reports, ragas_scores, suffix)
+        logger.info("wrote {}", RESULTS_DIR / f"results{suffix}.md")
 
 
 if __name__ == "__main__":

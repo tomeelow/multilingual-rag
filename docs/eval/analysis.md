@@ -62,6 +62,21 @@ key to measure.
 ## What the numbers do *not* show yet
 
 ragas generation metrics (context precision/recall, faithfulness, answer
-relevancy) and the HyDE configuration require an LLM key; the harness
-supports both (`--ragas`) and the results table has a placeholder section
-until that run happens.
+relevancy) and the HyDE configuration require an LLM key; the harness supports
+both (`--ragas`) and the results table has a placeholder section until that run
+happens.
+
+The ragas path is verified working — a single-item run scores all four metrics
+— but a full table has not been produced, and the obstacle is API quota rather
+than wiring. The metrics cost ~11 judge calls per item per config, so the
+four-config table needs ~2,700 requests against a free tier capped at 20/day.
+Measured budget and the reasoning in
+[../phases/ragas_generation_eval.md](../phases/ragas_generation_eval.md).
+
+The retrieval numbers above also predate the retrieval quality fixes
+(`../phases/retrieval_quality_fixes.md`). Two of those reach the ablation
+through the reranker — rights/duties intent weighting and legal-unit dedup —
+so the `hybrid_rerank` row in particular is stale and should be re-measured.
+The article-range and comparative fixes sit above `retriever.hybrid()` and do
+not affect these configs by design. The ablation is deterministic and needs no
+API key, so re-running it costs nothing but time.
