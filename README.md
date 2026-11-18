@@ -1,5 +1,11 @@
 # Multilingual RAG — EU / Polish / Ukrainian AI & Data-Protection Law
 
+![python](https://img.shields.io/badge/python-3.12-blue)
+![languages](https://img.shields.io/badge/languages-EN%20%7C%20PL%20%7C%20UK-6250d6)
+![LLM](https://img.shields.io/badge/LLM-OpenAI%20%7C%20Claude%20%7C%20Gemini-555)
+![docker](https://img.shields.io/badge/run-docker%20compose-2496ed)
+[![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Ask a legal-compliance question in English, Polish, or Ukrainian and get an
 answer **in your language, cited down to the article** — even when the answer
 lives in a statute written in another language. Built for the realistic case
@@ -10,6 +16,23 @@ law each demand — without reading four legal systems in three languages.
 **Stack:** Qdrant + BM25s hybrid retrieval (RRF) · `multilingual-e5-large`
 embeddings · cross-encoder reranking · parent-child chunking · HyDE ·
 FastAPI (SSE) · Streamlit · ragas evaluation · Docker Compose.
+
+## At a glance
+
+| | |
+|---|---|
+| **Problem** | Legal questions that cross languages and jurisdictions: the answer to a Ukrainian question may sit in an English EU regulation |
+| **Corpus** | 9 official and guidance documents (EU AI Act, GDPR in EN and PL, DSA, Polish and Ukrainian data-protection law, the Polish Labour Code, EDPB and UODO guidance), parsed into 3,710 article-aware chunks with full provenance |
+| **Retrieval** | Dense (`multilingual-e5-large`, Qdrant) + BM25 fused with RRF, a multilingual cross-encoder reranker, parent-child context and optional HyDE |
+| **Evaluation** | A hand-built 57-question golden set across 3 languages and 3 difficulty types. Reranking lifts unit hit@5 from 0.727 to **0.782** and MRR from 0.544 to **0.675** over dense-only retrieval; ragas generation metrics are wired in |
+| **Debugging from data** | The first evaluation showed an English-only reranker silently dropping correct Polish and Ukrainian passages, so it was replaced with `bge-reranker-v2-m3` |
+| **Product** | Streaming FastAPI backend (SSE), a Streamlit UI with language-coded citations and per-stage latency, three swappable LLM providers behind a cache, and a retrieval-only mode that needs no API key |
+| **Engineering** | Docker Compose with automatic first-run indexing, pytest suite, ADRs and per-phase status notes |
+
+**What it shows about how I work:** structure-aware ingestion before embeddings (legal
+text is split by article and recital, not by token count), deterministic retrieval
+metrics before LLM-judged ones, and citations that keep the source language rather than
+hiding it.
 
 ## Product demo
 
@@ -171,7 +194,7 @@ Measured numbers in
 ## Setup
 
 ```bash
-git clone <repo-url> && cd multilingual-rag
+git clone https://github.com/tomeelow/multilingual-rag.git && cd multilingual-rag
 cp .env.example .env   # set LLM_PROVIDER + its key (optional: retrieval works without)
 docker compose up
 ```
@@ -230,3 +253,10 @@ phase status reports in [docs/phases/](docs/phases/).
 - **Paragraph-level citations** (Art. 6 ust. 1 lit. f / Стаття 8 ч. 2) —
   metadata currently stops at article level; statutory paragraph anchors
   would make citations directly pasteable into legal work.
+
+## License
+
+The code is released under the [MIT License](LICENSE). The legal texts in the corpus are
+not committed; they are downloaded from their official publishers (EUR-Lex, ISAP, the
+Verkhovna Rada portal, EDPB and UODO) and remain under those publishers' terms. See
+[`data/README.md`](data/README.md).
